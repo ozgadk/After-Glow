@@ -51,3 +51,10 @@ reports are hidden from guests until an admin reviews them.
   Move to Storage + Cloud Vision SafeSearch when going multi-venue.
 - The word filter is client-side and can be bypassed; reports + the admin panel
   (and approval mode) are the real safety net.
+
+## Automatic rules deploy
+
+`.github/workflows/deploy-rules.yml` publishes `firestore.rules` on every push to
+`main`. It needs one repo secret, `FIREBASE_SERVICE_ACCOUNT` (the JSON key from
+Firebase → Project settings → Service accounts → Generate new private key).
+Without the secret the workflow just skips.
