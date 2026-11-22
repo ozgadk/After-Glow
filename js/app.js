@@ -2,7 +2,8 @@ import { firebaseConfig, DEFAULT_BAR, HIDE_AFTER_REPORTS, SDK } from "./firebase
 import { STRINGS, LANGS, pickLang, saveLang } from "./i18n.js";
 import { checkText } from "./filter.js";
 import { processPhoto, looksSafe, warmSafetyModel } from "./photo.js";
-import { MOODS as PAINT_MOODS, MOOD_KEYS, nightId } from "./painting.js";
+import { MOODS as PAINT_MOODS, MOOD_KEYS } from "./painting.js";
+import { DEFAULT_TARGET, roundKey, makePostcard } from "./rounds.js";
 
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, signInAnonymously, onAuthStateChanged } = await import(`${SDK}/firebase-auth.js`);
@@ -58,6 +59,11 @@ let user = null;
 let mood = "";
 let photo = null; // { dataUrl, canvas }
 let paintMood = "joy";
+let curRound = 1, roundTarget = DEFAULT_TARGET, roundCount = 0, barName = "The Snuggest";
+const MINE_KEY = "ag_mine";
+const loadMine = () => { try { return JSON.parse(localStorage.getItem(MINE_KEY) || "[]"); } catch { return []; } };
+const saveMine = (m) => { try { localStorage.setItem(MINE_KEY, JSON.stringify(m.slice(-20))); } catch {} };
+const keepsakes = new Map(); // roundNum -> { round doc, image }
 const photoCache = new Map();
 const MOODS = ["✨", "🍷", "💛", "😂", "🌙", "🎶"];
 
@@ -213,8 +219,13 @@ function renderPaint() {
   if (!el) return;
   const draft = document.getElementById("pword")?.value || "";
   el.className = "paint";
-  el.innerHTML = `<h2></h2><p class="hint"></p><div class="swatches" id="sw"></div>
+  el.innerHTML = `<div id="keeps"></div><h2></h2><p class="hint"></p>
+    <div class="pprog"><i style="width:${Math.min(100, (roundCount / roundTarget) * 100)}%"></i></div>
+    <p class="pcount"></p>
+    <div class="swatches" id="sw"></div>
     <div class="paint-row"><input id="pword" maxlength="20" autocomplete="off"><button class="send" id="psend"></button></div>`;
+  el.querySelector(".pcount").textContent = t("progress", { n: roundCount, target: roundTarget, left: Math.max(0, roundTarget - roundCount) });
+  renderKeepsakes();
   el.querySelector("h2").textContent = t("paintTitle");
   el.querySelector(".hint").textContent = t("paintHint");
   const sw = el.querySelector("#sw");
@@ -247,12 +258,17 @@ async function sendWord() {
   const batch = writeBatch(db);
   const data = { word, color: paintMood, createdAt: serverTimestamp(), uid: user.uid };
   if (table) data.table = table;
-  batch.set(doc(collection(db, "bars", barId, "nights", nightId(), "strokes")), data);
+  const ref = doc(collection(db, "bars", barId, "rounds", roundKey(curRound), "strokes"));
+  batch.set(ref, data);
   batch.set(doc(db, "strokeLimits", user.uid), { last: serverTimestamp() });
   try {
     await batch.commit();
     inp.value = "";
     toast(t("painted"));
+    const mine = loadMine();
+    mine.push({ bar: barId, r: curRound, w: word });
+    saveMine(mine);
+    watchMyRounds();
   } catch (e) {
     console.error(e);
     toast(e.code === "permission-denied" ? t("paintTooFast") : t("error"));
@@ -297,6 +313,102 @@ function renderNotes() {
     return;
   }
   visible.forEach((n) => el.appendChild(noteEl(n)));
+}
+
+// ---- living painting: rounds + keepsakes ----
+let countUnsub = null, countRound = null;
+function watchBar() {
+  onSnapshot(doc(db, "bars", barId), (snap) => {
+    const d = snap.exists() ? snap.data() : {};
+    curRound = d.currentRound || 1;
+    roundTarget = Math.min(30, Math.max(20, d.roundTarget || DEFAULT_TARGET));
+    if (d.name) barName = d.name;
+    if (countRound !== curRound) {
+      countRound = curRound;
+      countUnsub?.();
+      countUnsub = onSnapshot(collection(db, "bars", barId, "rounds", roundKey(curRound), "strokes"), (s) => {
+        roundCount = s.size;
+        updateProgress();
+      });
+    }
+    updateProgress();
+  });
+}
+function updateProgress() {
+  const el = document.getElementById("paint");
+  if (!el) return;
+  const bar = el.querySelector(".pprog i");
+  const txt = el.querySelector(".pcount");
+  if (bar) bar.style.width = `${Math.min(100, (roundCount / roundTarget) * 100)}%`;
+  if (txt) txt.textContent = t("progress", { n: roundCount, target: roundTarget, left: Math.max(0, roundTarget - roundCount) });
+}
+
+const watched = new Set();
+function watchMyRounds() {
+  const mine = loadMine().filter((m) => m.bar === barId);
+  const rounds = [...new Set(mine.map((m) => m.r))].slice(-3);
+  for (const r of rounds) {
+    if (watched.has(r)) continue;
+    watched.add(r);
+    onSnapshot(doc(db, "bars", barId, "rounds", roundKey(r)), async (snap) => {
+      const d = snap.data();
+      if (!d) return;
+      if (d.status === "done" && !keepsakes.get(r)?.image) {
+        const img = await getDoc(doc(db, "bars", barId, "roundImages", roundKey(r)));
+        keepsakes.set(r, { round: d, image: img.exists() ? img.data().data : null });
+      } else if (d.status === "generating") {
+        keepsakes.set(r, { round: d, image: null });
+      }
+      renderKeepsakes();
+    });
+  }
+}
+
+function renderKeepsakes() {
+  const box = document.getElementById("keeps");
+  if (!box) return;
+  box.innerHTML = "";
+  const mine = loadMine().filter((m) => m.bar === barId);
+  for (const [r, k] of [...keepsakes.entries()].sort((a, b) => b[0] - a[0])) {
+    const card = document.createElement("div");
+    card.className = "keep";
+    if (!k.image) {
+      card.innerHTML = `<p class="kwait"></p>`;
+      card.querySelector(".kwait").textContent = t("revealSoon");
+      box.appendChild(card);
+      continue;
+    }
+    const myWords = mine.filter((m) => m.r === r).map((m) => m.w);
+    const others = Math.max(0, (k.round.count || 1) - 1);
+    card.innerHTML = `<h3></h3><img alt=""><p class="ktext"></p><button class="send kbtn"></button>`;
+    card.querySelector("h3").textContent = t("keepTitle");
+    card.querySelector("img").src = k.image;
+    card.querySelector(".ktext").textContent = t("keepText", { n: others, w: myWords.join(", ") });
+    const btn = card.querySelector(".kbtn");
+    btn.textContent = t("keepBtn");
+    btn.onclick = async () => {
+      btn.disabled = true;
+      try {
+        const date = new Intl.DateTimeFormat(lang, { day: "2-digit", month: "2-digit", year: "numeric" })
+          .format(k.round.closedAt?.toDate?.() || new Date());
+        const blob = await makePostcard({
+          image: k.image, words: k.round.words || [], mine: myWords, n: r,
+          count: k.round.count || (k.round.words || []).length, barName, date,
+          line: t("postcardLine", { n: k.round.count || "" })
+        });
+        const file = new File([blob], `afterglow-${barId}-${r}.jpg`, { type: "image/jpeg" });
+        if (navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file], title: "Afterglow" }).catch(() => {});
+        } else {
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob); a.download = file.name; a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        }
+      } catch (e) { console.error(e); toast(t("error")); }
+      btn.disabled = false;
+    };
+    box.appendChild(card);
+  }
 }
 
 // ---- data ----
@@ -421,3 +533,5 @@ if (table) {
   listen();
 }
 if (paintOnly) render();
+watchBar();
+watchMyRounds();

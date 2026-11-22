@@ -45,6 +45,24 @@
       background: rgba(13,7,12,0.85); color: #f6e9e2; font-family: "Inter", sans-serif; cursor: pointer; text-align: center;
     }
     .start b { font-family: "Fraunces", serif; font-size: 34px; font-weight: 500; }
+    .reveal { position: absolute; inset: 0; opacity: 0; transition: opacity 4s ease; pointer-events: none; }
+    .reveal.on { opacity: 1; }
+    .reveal img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .reveal .cap {
+      position: absolute; left: 0; right: 0; bottom: 0; padding: 6vh 22vh 4vh 4%;
+      background: linear-gradient(transparent, rgba(13,7,12,0.85));
+      color: #fff3e0; font-family: "Caveat", cursive; font-size: 3vh; line-height: 1.35;
+    }
+    .reveal .cap b { display: block; font-family: "Fraunces", serif; font-weight: 500; font-size: 5vh; }
+    .gen {
+      position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); text-align: center;
+      font-family: "Fraunces", serif; font-size: 5vh; color: #fff3e0; text-shadow: 0 0 30px rgba(255,160,100,0.9);
+      opacity: 0; transition: opacity 1.5s; pointer-events: none;
+    }
+    .gen.on { opacity: 1; animation: pulse 2.4s ease-in-out infinite; }
+    @keyframes pulse { 50% { text-shadow: 0 0 60px rgba(255,120,140,1); } }
+    .bar { width: 22vh; height: 0.7vh; background: rgba(255,255,255,0.12); border-radius: 1vh; margin-top: 0.8vh; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb36b, #ff6f8e); transition: width 0.8s; }
     .saved { position: absolute; top: 2%; right: 2%; font: 12px "Inter", sans-serif; color: rgba(255,255,255,0.35); }
   </style>
 </head>
@@ -56,7 +74,10 @@
       <div class="logo">Afterglow</div>
       <div class="t" id="title">TONIGHT'S PAINTING</div>
       <div class="count" id="count"></div>
+      <div class="bar"><i id="prog"></i></div>
     </div>
+    <div class="gen" id="gen">The painting is coming to life…</div>
+    <div class="reveal" id="reveal"><img id="revImg" alt=""><div class="cap" id="revCap"></div></div>
     <div class="qr" id="qr"><img id="qrImg" alt=""><span>Add your word ✦</span></div>
     <div class="saved" id="saved"></div>
   </div>
@@ -64,80 +85,126 @@
 
 <script type="module">
 import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
-import { W, H, nightId, renderAll, computeParticles, drawBloom, drawParticle } from "./js/painting.js";
+import { W, H, renderAll, computeParticles, drawBloom, drawParticle } from "./js/painting.js";
+import { DEFAULT_TARGET, roundKey, finishRound } from "./js/rounds.js";
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, onAuthStateChanged } = await import(`${SDK}/firebase-auth.js`);
-const { getFirestore, collection, doc, getDoc, setDoc, onSnapshot, serverTimestamp } = await import(`${SDK}/firebase-firestore.js`);
+const fsmod = await import(`${SDK}/firebase-firestore.js`);
+const { getFirestore, collection, doc, getDoc, onSnapshot } = fsmod;
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const barId = (new URLSearchParams(location.search).get("bar") || DEFAULT_BAR).toLowerCase().replace(/[^a-z0-9-]/g, "");
+const $ = (id) => document.getElementById(id);
 
-const canvas = document.getElementById("c");
+const canvas = $("c");
 const ctx = canvas.getContext("2d");
-const wordsEl = document.getElementById("words");
-const countEl = document.getElementById("count");
+$("qrImg").src = `assets/qr-paint-${barId}.svg`;
+$("qrImg").onerror = () => ($("qr").style.display = "none");
 
-// QR for "add your word" (static per bar; hidden if missing)
-const qrImg = document.getElementById("qrImg");
-qrImg.src = `assets/qr-paint-${barId}.svg`;
-qrImg.onerror = () => (document.getElementById("qr").style.display = "none");
-
-let night = nightId();
-let strokes = [];
-let unsub = null;
-const queue = []; // strokes waiting to be animated
-let isAdmin = false, lastSavedCount = -1;
-
+let round = null, target = DEFAULT_TARGET, strokes = [], unsub = null, isAdmin = false, finishing = false;
+const queue = [];
 const ts = (s) => s.createdAt?.toMillis?.() ?? Date.now();
-const setCount = () => (countEl.textContent = strokes.length ? `${strokes.length} ${strokes.length === 1 ? "word" : "words"} so far` : "Waiting for the first word…");
+const key = () => barId + roundKey(round);
+
+function setCount() {
+  const n = strokes.length, left = Math.max(0, target - n);
+  $("count").textContent = n ? `${n} / ${target} words · ${left} to go` : `Painting #${round} · waiting for the first word…`;
+  $("prog").style.width = `${Math.min(100, (n / target) * 100)}%`;
+}
 
 function subscribe() {
   unsub?.();
-  strokes = [];
-  queue.length = 0;
-  renderAll(ctx, [], night);
+  strokes = []; queue.length = 0; current = null;
+  renderAll(ctx, [], key());
   let first = true;
-  unsub = onSnapshot(collection(db, "bars", barId, "nights", night, "strokes"), (snap) => {
+  const r = round;
+  unsub = onSnapshot(collection(db, "bars", barId, "rounds", roundKey(r), "strokes"), (snap) => {
+    if (r !== round) return;
     const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ts(a) - ts(b));
-    const removed = snap.docChanges().some((c) => c.type === "removed");
-    if (first || removed) {
-      first = false;
-      strokes = all;
-      queue.length = 0;
-      renderAll(ctx, strokes, night);
+    if (first || snap.docChanges().some((c) => c.type === "removed")) {
+      first = false; strokes = all; queue.length = 0; renderAll(ctx, strokes, key());
     } else {
       for (const c of snap.docChanges()) {
         if (c.type === "added" && !strokes.some((s) => s.id === c.doc.id)) {
-          const s = { id: c.doc.id, ...c.doc.data() };
-          strokes.push(s);
-          queue.push(s);
+          const s = { id: c.doc.id, ...c.doc.data() }; strokes.push(s); queue.push(s);
         }
       }
     }
     setCount();
+    maybeFinish();
   }, (e) => console.error(e));
 }
 
-// ---- animation: a new word "paints itself" over ~3 seconds ----
+async function maybeFinish() {
+  if (!isAdmin || finishing || strokes.length < target) return;
+  finishing = true;
+  try { await finishRound(db, fsmod, barId, round, [...strokes].sort((a, b) => ts(a) - ts(b))); }
+  catch (e) { if (e.message !== "already-finished") console.error(e); }
+  finishing = false;
+}
+
+// bar doc → current round + target; when the round advances, reveal the finished one
+let watching = null;
+onSnapshot(doc(db, "bars", barId), (snap) => {
+  const d = snap.exists() ? snap.data() : {};
+  target = Math.min(30, Math.max(20, d.roundTarget || DEFAULT_TARGET));
+  const n = d.currentRound || 1;
+  if (round !== n) {
+    const prev = round;
+    round = n;
+    subscribe();
+    if (prev !== null && prev < n) watchReveal(prev);
+  }
+  setCount();
+});
+
+function watchReveal(n) {
+  watching?.();
+  watching = onSnapshot(doc(db, "bars", barId, "rounds", roundKey(n)), async (snap) => {
+    const d = snap.data();
+    if (!d) return;
+    $("gen").classList.toggle("on", d.status === "generating");
+    if (d.status === "done") {
+      watching?.(); watching = null;
+      const img = await getDoc(doc(db, "bars", barId, "roundImages", roundKey(n)));
+      if (img.exists()) reveal(n, img.data().data, d.words || []);
+    }
+  });
+}
+
+let revealTimer = null;
+function reveal(n, src, words) {
+  $("gen").classList.remove("on");
+  $("revImg").src = src;
+  $("revCap").innerHTML = "";
+  const b = document.createElement("b");
+  b.textContent = `Painting #${n} · painted together by ${words.length} strangers`;
+  const p = document.createElement("div");
+  p.textContent = words.map((w) => w.w).join(" · ");
+  $("revCap").append(b, p);
+  $("reveal").classList.add("on");
+  clearTimeout(revealTimer);
+  revealTimer = setTimeout(() => $("reveal").classList.remove("on"), 75 * 1000);
+}
+
+// ---- live animation of new words ----
 let current = null, tick = 0;
 function frame() {
   if (!current && queue.length) {
     const s = queue.shift();
-    const data = computeParticles(s, night);
+    const data = computeParticles(s, key());
     drawBloom(ctx, data);
     current = { data, i: 0 };
     showWord(s, data.cx, data.cy);
   }
   if (current) {
-    // one brush stroke every other frame → a word paints itself in ~1.5–2 s
     if ((tick++ & 1) === 0) drawParticle(ctx, current.data.parts[current.i++]);
     if (current.i >= current.data.parts.length) current = null;
   }
   requestAnimationFrame(frame);
 }
-
 function showWord(s, x, y) {
   const el = document.createElement("div");
   el.className = "word";
@@ -145,53 +212,26 @@ function showWord(s, x, y) {
   el.style.top = `${(y / H) * 100}%`;
   el.textContent = s.word;
   if (s.table) { const sm = document.createElement("small"); sm.textContent = `table ${s.table}`; el.appendChild(sm); }
-  wordsEl.appendChild(el);
+  $("words").appendChild(el);
   setTimeout(() => el.remove(), 7500);
 }
 
-// ---- night rollover (06:00 Riga) ----
-setInterval(() => {
-  const n = nightId();
-  if (n !== night) { saveNow(); night = n; subscribe(); }
-}, 60 * 1000);
-
-// ---- auto-save tonight's painting when an admin is signed in on this screen ----
-async function saveNow() {
-  if (!isAdmin || !strokes.length || strokes.length === lastSavedCount) return;
-  const out = document.createElement("canvas");
-  out.width = W; out.height = H;
-  renderAll(out.getContext("2d"), strokes, night);
-  let q = 0.88, data = out.toDataURL("image/jpeg", q);
-  while (data.length > 900000 && q > 0.4) { q -= 0.08; data = out.toDataURL("image/jpeg", q); }
-  try {
-    await setDoc(doc(db, "bars", barId, "paintings", night), { data, words: strokes.length, updatedAt: serverTimestamp() });
-    lastSavedCount = strokes.length;
-    document.getElementById("saved").textContent = `saved ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
-  } catch (e) { console.warn("save failed", e); }
-}
-setInterval(saveNow, 15 * 60 * 1000);
-
 onAuthStateChanged(auth, async (u) => {
   isAdmin = false;
-  if (u && !u.isAnonymous) {
-    try { isAdmin = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch {}
-  }
-  document.getElementById("saved").textContent = isAdmin ? "auto-save on" : "";
+  if (u && !u.isAnonymous) { try { isAdmin = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch {} }
+  $("saved").textContent = isAdmin ? "host mode · rounds close automatically" : "view only · sign in on admin.html to run rounds";
+  maybeFinish();
 });
 
-// ---- start: fullscreen + keep awake ----
 let wake = null;
 async function keepAwake() { try { wake = await navigator.wakeLock?.request("screen"); } catch {} }
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") keepAwake(); });
-const startEl = document.getElementById("start");
+const startEl = $("start");
 if (startEl) startEl.onclick = async (e) => {
   e.currentTarget.remove();
   try { await document.documentElement.requestFullscreen(); } catch {}
   keepAwake();
 };
-
-subscribe();
-setCount();
 requestAnimationFrame(frame);
 </script>
 </body>

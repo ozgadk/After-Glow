@@ -2,6 +2,12 @@ export const LANGS = ["en", "lv", "ru", "tr"];
 
 export const STRINGS = {
   en: {
+    progress: "{n} of {target} words · {left} to go",
+    revealSoon: "Your painting is being revealed on the screen ✦",
+    keepTitle: "Your memory from tonight",
+    keepText: "You and {n} strangers painted this together. Your word: “{w}”",
+    keepBtn: "Save my postcard",
+    postcardLine: "Painted together by {n} strangers",
     paintTitle: "🎨 Add a word to tonight's painting",
     paintHint: "It turns into brushstrokes on the bar screen.",
     paintPlaceholder: "One word…",
@@ -37,6 +43,12 @@ export const STRINGS = {
     loading: "Opening the table…"
   },
   lv: {
+    progress: "{n} no {target} vārdiem · vēl {left}",
+    revealSoon: "Tava glezna tiek atklāta uz ekrāna ✦",
+    keepTitle: "Tava atmiņa no šī vakara",
+    keepText: "Tu un vēl {n} svešinieki to uzgleznojāt kopā. Tavs vārds: “{w}”",
+    keepBtn: "Saglabāt manu pastkarti",
+    postcardLine: "Kopā uzgleznojuši {n} svešinieki",
     paintTitle: "🎨 Pievieno vārdu šīvakara gleznai",
     paintHint: "Tas pārvēršas otas triepienos uz bāra ekrāna.",
     paintPlaceholder: "Viens vārds…",
@@ -72,6 +84,12 @@ export const STRINGS = {
     loading: "Atveram galdu…"
   },
   ru: {
+    progress: "{n} из {target} слов · осталось {left}",
+    revealSoon: "Твоя картина появляется на экране ✦",
+    keepTitle: "Твоё воспоминание об этом вечере",
+    keepText: "Ты и ещё {n} незнакомцев нарисовали это вместе. Твоё слово: «{w}»",
+    keepBtn: "Сохранить открытку",
+    postcardLine: "Нарисовано вместе: {n} незнакомцев",
     paintTitle: "🎨 Добавь слово в сегодняшнюю картину",
     paintHint: "Оно превратится в мазки кисти на экране бара.",
     paintPlaceholder: "Одно слово…",
@@ -107,6 +125,12 @@ export const STRINGS = {
     loading: "Открываем столик…"
   },
   tr: {
+    progress: "{target} kelimeden {n} · {left} kaldı",
+    revealSoon: "Tablon ekranda beliriyor ✦",
+    keepTitle: "Bu geceden hatıran",
+    keepText: "Sen ve {n} yabancı bunu birlikte boyadınız. Senin kelimen: “{w}”",
+    keepBtn: "Kartpostalımı kaydet",
+    postcardLine: "{n} yabancı birlikte boyadı",
     paintTitle: "🎨 Bu gecenin tablosuna bir kelime ekle",
     paintHint: "Bar ekranında fırça darbelerine dönüşür.",
     paintPlaceholder: "Tek kelime…",

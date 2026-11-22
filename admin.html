@@ -34,10 +34,12 @@
 
 <script type="module">
 import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
-import { W, H, nightId, renderAll, MOODS } from "./js/painting.js";
+import { W, H, renderAll, MOODS } from "./js/painting.js";
+import { DEFAULT_TARGET, roundKey, finishRound, regenerate } from "./js/rounds.js";
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import(`${SDK}/firebase-auth.js`);
-const { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, serverTimestamp } = await import(`${SDK}/firebase-firestore.js`);
+const fsmod = await import(`${SDK}/firebase-firestore.js`);
+const { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, serverTimestamp } = fsmod;
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -151,64 +153,92 @@ function renderList() {
   }
 }
 
-// ---- Living Painting ----
-let paintUnsub = null, tonight = [];
+// ---- Living Painting (rounds) ----
+let paintUnsub = null, barUnsub = null, cur = 1, target = DEFAULT_TARGET, words = [];
 function paintView() {
-  const night = nightId();
   $("#paintSec").innerHTML = `
     <div class="card">
-      <div>Tonight: <b>${esc(night)}</b> · <span id="pc">…</span></div>
-      <p class="intro" style="margin:8px 0">Bar screen: <code>ozgadk.github.io/After-Glow/screen.html</code></p>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn primary" id="psave">Save tonight's painting</button>
-        <a class="btn" href="screen.html?bar=${encodeURIComponent(barId)}" target="_blank">Open screen ↗</a>
+      <div>Painting <b id="rn">#…</b> · <span id="pc">…</span></div>
+      <label style="margin-top:10px">Words per painting <input type="number" id="tgt" min="20" max="30" style="width:70px"> <button class="btn" id="tsave">Save</button></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn primary" id="pfinish">Finish this painting now</button>
+        <a class="btn" href="screen.html?bar=${encodeURIComponent(barId)}" target="_blank">Open bar screen ↗</a>
       </div>
-      <img id="pprev" style="display:block;width:100%;border-radius:8px;margin-top:12px">
+      <p class="intro" style="margin:10px 0 0;font-size:13px">The bar screen closes a painting automatically when it reaches the target, as long as you're signed in on that screen.</p>
     </div>
-    <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Tonight's words</h3>
+    <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Words in this painting</h3>
     <div id="wlist"></div>
-    <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Saved paintings</h3>
+    <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Finished paintings</h3>
     <div id="plist"><p class="intro">Loading…</p></div>`;
+  barUnsub?.();
+  barUnsub = onSnapshot(doc(db, "bars", barId), (snap) => {
+    const d = snap.exists() ? snap.data() : {};
+    target = Math.min(30, Math.max(20, d.roundTarget || DEFAULT_TARGET));
+    if ($("#tgt") && document.activeElement !== $("#tgt")) $("#tgt").value = target;
+    const n = d.currentRound || 1;
+    if (n !== cur || !paintUnsub) { cur = n; listenWords(); loadRounds(); }
+    $("#rn").textContent = `#${cur}`;
+  });
+  $("#tsave").onclick = () => {
+    const v = Math.min(30, Math.max(20, parseInt($("#tgt").value, 10) || DEFAULT_TARGET));
+    setDoc(doc(db, "bars", barId), { roundTarget: v }, { merge: true }).then(() => toast(`Target: ${v} words`));
+  };
+  $("#pfinish").onclick = async () => {
+    if (!words.length) return toast("No words yet");
+    if (!confirm(`Finish painting #${cur} with ${words.length} words and generate the image?`)) return;
+    toast("Generating… this can take up to a minute");
+    try { await finishRound(db, fsmod, barId, cur, words); toast("Done"); loadRounds(); }
+    catch (e) { toast(e.message === "already-finished" ? "Already finished by the screen" : e.message); }
+  };
+}
+
+function listenWords() {
   paintUnsub?.();
-  paintUnsub = onSnapshot(collection(db, "bars", barId, "nights", night, "strokes"), (snap) => {
-    tonight = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+  paintUnsub = onSnapshot(collection(db, "bars", barId, "rounds", roundKey(cur), "strokes"), (snap) => {
+    words = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (a.createdAt?.toMillis() || 0) - (b.createdAt?.toMillis() || 0));
-    $("#pc").textContent = `${tonight.length} words`;
-    const c = document.createElement("canvas"); c.width = W; c.height = H;
-    renderAll(c.getContext("2d"), tonight, night);
-    $("#pprev").src = c.toDataURL("image/jpeg", 0.7);
-    const wl = $("#wlist"); wl.innerHTML = tonight.length ? "" : `<p class="intro">No words yet tonight.</p>`;
-    for (const w of [...tonight].reverse()) {
+    $("#pc").textContent = `${words.length} / ${target} words`;
+    const wl = $("#wlist"); wl.innerHTML = words.length ? "" : `<p class="intro">No words yet.</p>`;
+    for (const w of [...words].reverse()) {
       const el = document.createElement("div"); el.className = "item";
       el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span>${esc(MOODS[w.color]?.emoji || "")} <b>${esc(w.word)}</b> <span style="color:#7a5e52;font-size:12px">${w.table ? "table " + esc(w.table) + " · " : ""}${w.createdAt ? esc(w.createdAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) : ""}</span></span>
         <button class="btn danger" style="color:#c0392b;border-color:#e5a39b;padding:5px 10px;font-size:12px">Remove</button></div>`;
-      el.querySelector("button").onclick = () => deleteDoc(doc(db, "bars", barId, "nights", night, "strokes", w.id));
+      el.querySelector("button").onclick = () => deleteDoc(doc(db, "bars", barId, "rounds", roundKey(cur), "strokes", w.id));
       wl.appendChild(el);
     }
   });
-  $("#psave").onclick = async () => {
-    if (!tonight.length) return toast("Nothing to save yet");
-    const c = document.createElement("canvas"); c.width = W; c.height = H;
-    renderAll(c.getContext("2d"), tonight, night);
-    let q = 0.88, data = c.toDataURL("image/jpeg", q);
-    while (data.length > 900000 && q > 0.4) { q -= 0.08; data = c.toDataURL("image/jpeg", q); }
-    await setDoc(doc(db, "bars", barId, "paintings", night), { data, words: tonight.length, updatedAt: serverTimestamp() });
-    toast("Saved"); loadPaintings();
-  };
-  loadPaintings();
 }
 
-async function loadPaintings() {
-  const snap = await getDocs(collection(db, "bars", barId, "paintings"));
+async function loadRounds() {
   const pl = $("#plist"); if (!pl) return;
-  const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => b.id.localeCompare(a.id));
-  pl.innerHTML = items.length ? "" : `<p class="intro">None yet. The bar screen saves automatically every 15 min when you're signed in on it.</p>`;
-  for (const p of items) {
+  const snap = await getDocs(collection(db, "bars", barId, "rounds"));
+  const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status)
+    .sort((a, b) => (b.n || 0) - (a.n || 0));
+  pl.innerHTML = items.length ? "" : `<p class="intro">None yet.</p>`;
+  for (const r of items) {
     const el = document.createElement("div"); el.className = "item";
-    el.innerHTML = `<img src="${p.data}" style="display:block;width:100%;border-radius:6px">
-      <div class="meta">${esc(p.id)} · ${p.words || 0} words</div>
-      <div class="actions"><a class="btn" download="afterglow-${esc(barId)}-${esc(p.id)}.jpg" href="${p.data}">⬇ Download</a></div>`;
+    el.innerHTML = `<img style="display:block;width:100%;border-radius:6px;background:#e9d6c3;min-height:80px">
+      <div class="meta">#${r.n} · ${r.count || 0} words · ${esc(r.status)}${r.source === "abstract" ? " · AI failed, abstract version used" : ""}</div>
+      <div style="font-size:13px;margin-bottom:8px">${esc((r.words || []).map((w) => w.w).join(" · "))}</div>
+      <div class="actions"></div>`;
+    const acts = el.querySelector(".actions");
+    getDoc(doc(db, "bars", barId, "roundImages", r.id)).then((s) => {
+      if (!s.exists()) return;
+      const src = s.data().data;
+      el.querySelector("img").src = src;
+      const a = document.createElement("a"); a.className = "btn"; a.textContent = "⬇ Download";
+      a.download = `afterglow-${barId}-${r.id}.jpg`; a.href = src; acts.prepend(a);
+    });
+    const re = document.createElement("button"); re.className = "btn"; re.textContent = "↻ Regenerate";
+    re.onclick = async () => {
+      if (!confirm("Generate a new image for this painting? Guests' postcards will show the new one.")) return;
+      re.disabled = true; toast("Generating…");
+      const strokes = (r.words || []).map((w, i) => ({ id: String(i), word: w.w, color: w.c, table: w.t }));
+      try { await regenerate(db, fsmod, barId, r.n, strokes, r.prompt); toast("Done"); loadRounds(); }
+      catch (e) { toast(e.message); re.disabled = false; }
+    };
+    acts.appendChild(re);
     pl.appendChild(el);
   }
 }

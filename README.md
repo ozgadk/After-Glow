@@ -9,11 +9,20 @@ Includes photos: resized on the phone, given the warm "Afterglow" tone, EXIF/GPS
 checked on-device for nudity (nsfw.js), stored in `bars/{barId}/photos/{noteId}` and always
 held for admin approval.
 
-**Phase 2:** Living Painting. Guests pick a mood colour and send one word; on the bar
-screen each word becomes glowing brush strokes along a flow field unique to that night.
-Rendering is deterministic (seeded by word + night), so a reload rebuilds the same
-painting. Nights roll over at 06:00 Riga time. An admin signed in on the screen device
-auto-saves the painting every 15 min to `bars/{barId}/paintings/{YYYY-MM-DD}`.
+**Phase 2:** Living Painting in rounds. Guests pick a mood colour and send one word;
+on the bar screen each word becomes glowing brush strokes. When a round reaches its
+target (20–30 words, set in admin), the host screen builds a prompt from the words and
+moods, generates an image (Pollinations, free tier; falls back to the abstract painting
+if that fails), reveals it, and opens the next round. Every participant's phone then
+shows a keepsake: the image plus all words with theirs highlighted, saved as a
+1080×1920 postcard.
+
+Rounds close automatically only on a screen where an admin is signed in
+(`screen.html`), or manually from the admin panel.
+
+Data: `bars/{barId}` `{currentRound, roundTarget}` ·
+`bars/{barId}/rounds/r{n}/strokes/*` · `bars/{barId}/rounds/r{n}` (words, prompt,
+status) · `bars/{barId}/roundImages/r{n}` (JPEG).
 
 Next: AR wall gallery.
 
