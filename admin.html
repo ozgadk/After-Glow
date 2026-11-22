@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Afterglow · Admin</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .card { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; padding: 14px; margin-top: 12px; }
+    .btn { border: 1px solid rgba(255,255,255,0.2); background: transparent; color: #fff; border-radius: 999px; padding: 8px 14px; cursor: pointer; font-size: 14px; }
+    .btn.primary { background: var(--amber); color: var(--night); border-color: var(--amber); font-weight: 600; }
+    .btn.danger { border-color: #e74c3c; color: #ff8a7a; }
+    .tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 18px 0 6px; }
+    .tabs .btn.on { background: #fff; color: var(--night); }
+    .item { background: var(--paper); color: var(--ink); border-radius: 10px; padding: 12px; margin-top: 10px; }
+    .item .meta { font-size: 12px; color: #7a5e52; margin: 6px 0 10px; }
+    .item .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .item .actions .btn { color: var(--ink); border-color: rgba(0,0,0,0.2); padding: 6px 12px; font-size: 13px; }
+    .badge { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 999px; background: #eee; margin-left: 6px; }
+    .badge.pending { background: #ffe08a; } .badge.hidden { background: #ddd; } .badge.rep { background: #ffb4a8; }
+    code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
+    label { display: flex; align-items: center; gap: 10px; }
+    input[type=text] { background: var(--paper); border: none; border-radius: 8px; padding: 8px 10px; font-size: 15px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header><div class="logo">Afterglow · Admin</div><button class="btn" id="out" hidden>Sign out</button></header>
+  <div id="app"><p class="loading">Loading…</p></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
+const { initializeApp } = await import(`${SDK}/firebase-app.js`);
+const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import(`${SDK}/firebase-auth.js`);
+const { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot } = await import(`${SDK}/firebase-firestore.js`);
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+const barId = (new URLSearchParams(location.search).get("bar") || DEFAULT_BAR).toLowerCase();
+let notes = [], filter = "attention", unsub = null, bar = {};
+
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2500); }
+
+function signInView() {
+  $("#app").innerHTML = `<div class="card"><p>Sign in with Google to moderate notes.</p>
+    <button class="btn primary" id="g">Sign in with Google</button></div>`;
+  $("#g").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => toast(e.message));
+}
+
+function notAdminView(u) {
+  $("#app").innerHTML = `<div class="card">
+    <p><b>Almost there.</b> This account isn't an admin yet.</p>
+    <p>In Firebase Console → Firestore → create collection <code>admins</code>, and add a document whose <b>Document ID</b> is:</p>
+    <p><code id="uid">${esc(u.uid)}</code> <button class="btn" id="cp">Copy</button></p>
+    <p>Add any field (e.g. <code>name</code> = your name), save, then reload this page.</p></div>`;
+  $("#cp").onclick = () => navigator.clipboard.writeText(u.uid).then(() => toast("Copied"));
+}
+
+function adminView() {
+  $("#app").innerHTML = `
+    <div class="card">
+      <div>Bar: <b>${esc(barId)}</b></div>
+      <label style="margin-top:10px"><input type="checkbox" id="appr"> Approve every note before it appears</label>
+      <label style="margin-top:10px">Display name <input type="text" id="bname" placeholder="The Snuggest"> <button class="btn" id="bsave">Save</button></label>
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div id="stats" class="intro" style="margin:8px 0 0"></div>
+    <div id="list"></div>`;
+
+  getDoc(doc(db, "bars", barId)).then((s) => {
+    bar = s.exists() ? s.data() : {};
+    $("#appr").checked = bar.requireApproval === true;
+    $("#bname").value = bar.name || "";
+  });
+  $("#appr").onchange = (e) => setDoc(doc(db, "bars", barId), { requireApproval: e.target.checked }, { merge: true })
+    .then(() => toast(e.target.checked ? "Approval mode ON" : "Approval mode OFF"));
+  $("#bsave").onclick = () => setDoc(doc(db, "bars", barId), { name: $("#bname").value.trim() }, { merge: true }).then(() => toast("Saved"));
+
+  unsub?.();
+  unsub = onSnapshot(collection(db, "bars", barId, "notes"), (snap) => {
+    notes = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0));
+    renderList();
+  }, (e) => toast(e.message));
+}
+
+function renderList() {
+  const tabs = [
+    ["attention", "Needs attention", (n) => n.status === "pending" || (n.reportCount || 0) > 0 && n.status !== "hidden"],
+    ["visible", "Visible", (n) => n.status === "visible"],
+    ["hidden", "Hidden", (n) => n.status === "hidden"],
+    ["all", "All", () => true]
+  ];
+  $("#tabs").innerHTML = "";
+  for (const [k, label, fn] of tabs) {
+    const b = document.createElement("button");
+    b.className = "btn" + (k === filter ? " on" : "");
+    b.textContent = `${label} (${notes.filter(fn).length})`;
+    b.onclick = () => { filter = k; renderList(); };
+    $("#tabs").appendChild(b);
+  }
+  const tables = new Set(notes.filter((n) => n.status === "visible").map((n) => n.table));
+  $("#stats").textContent = `${notes.length} notes total · ${tables.size} tables with visible notes`;
+
+  const fn = tabs.find((x) => x[0] === filter)[2];
+  const list = notes.filter(fn);
+  $("#list").innerHTML = list.length ? "" : `<p class="intro">Nothing here 🎉</p>`;
+  for (const n of list) {
+    const el = document.createElement("div");
+    el.className = "item";
+    const when = n.createdAt ? n.createdAt.toDate().toLocaleString() : "";
+    el.innerHTML = `
+      <div>${esc(n.mood || "")} ${esc(n.text)}</div>
+      <div class="meta">Table <b>${esc(n.table)}</b> · ${esc(n.nick || "Anonymous")} · ${esc(when)}
+        ${n.status !== "visible" ? `<span class="badge ${esc(n.status)}">${esc(n.status)}</span>` : ""}
+        ${n.reportCount ? `<span class="badge rep">⚑ ${n.reportCount}</span>` : ""}</div>
+      <div class="actions"></div>`;
+    const acts = el.querySelector(".actions");
+    const add = (label, cls, fn) => { const b = document.createElement("button"); b.className = "btn " + cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); };
+    const ref = doc(db, "bars", barId, "notes", n.id);
+    if (n.status !== "visible") add("✓ Show", "", () => updateDoc(ref, { status: "visible", reportCount: 0 }));
+    if (n.status === "visible" && n.reportCount) add("✓ Keep (clear reports)", "", () => updateDoc(ref, { reportCount: 0 }));
+    if (n.status !== "hidden") add("Hide", "", () => updateDoc(ref, { status: "hidden" }));
+    add("Delete", "danger", () => { if (confirm("Delete this note forever?")) deleteDoc(ref); });
+    $("#list").appendChild(el);
+  }
+}
+
+$("#out").onclick = () => signOut(auth);
+
+onAuthStateChanged(auth, async (u) => {
+  unsub?.(); unsub = null;
+  $("#out").hidden = !u || u.isAnonymous;
+  if (!u || u.isAnonymous) return signInView();
+  try {
+    const s = await getDoc(doc(db, "admins", u.uid));
+    s.exists() ? adminView() : notAdminView(u);
+  } catch (e) { notAdminView(u); }
+});
+</script>
+</body>
+</html>

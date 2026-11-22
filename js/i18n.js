@@ -1,0 +1,103 @@
+export const LANGS = ["en", "lv", "ru", "tr"];
+
+export const STRINGS = {
+  en: {
+    table: "Table {n}",
+    intro: "Strangers sat here before you. Here's what they left behind.",
+    empty: "No notes yet. Be the first to leave a trace.",
+    composeTitle: "Leave a note for whoever sits here next",
+    placeholder: "A story, a tip, a secret, a hello…",
+    nick: "Name or nickname (optional)",
+    send: "Leave it here",
+    sent: "Your note is here now. Someone will find it.",
+    pending: "Thanks! Your note will appear after a quick check.",
+    tooFast: "Easy — wait a few seconds before the next note.",
+    blocked: "Let's keep it kind — try different words.",
+    noContacts: "Please no phone numbers or links.",
+    error: "Something went wrong. Try again.",
+    report: "Report",
+    reportSure: "Sure?",
+    reported: "Thanks, we'll take a look.",
+    anon: "Anonymous",
+    privacy: "No sign-up, no personal data. Please don't share phone numbers or private info.",
+    noTable: "Scan the QR code on your table to see its notes.",
+    loading: "Opening the table…"
+  },
+  lv: {
+    table: "Galds {n}",
+    intro: "Pirms tevis šeit sēdēja svešinieki. Lūk, ko viņi atstāja.",
+    empty: "Vēl nav nevienas zīmītes. Esi pirmais, kas atstāj pēdas.",
+    composeTitle: "Atstāj zīmīti nākamajam, kas šeit sēdēs",
+    placeholder: "Stāsts, padoms, noslēpums, sveiciens…",
+    nick: "Vārds vai segvārds (nav obligāts)",
+    send: "Atstāt šeit",
+    sent: "Tava zīmīte ir šeit. Kāds to atradīs.",
+    pending: "Paldies! Tava zīmīte parādīsies pēc ātras pārbaudes.",
+    tooFast: "Mierīgāk — pagaidi dažas sekundes līdz nākamajai zīmītei.",
+    blocked: "Paliksim laipni — pamēģini citus vārdus.",
+    noContacts: "Lūdzu, bez tālruņa numuriem un saitēm.",
+    error: "Kaut kas nogāja greizi. Mēģini vēlreiz.",
+    report: "Ziņot",
+    reportSure: "Tiešām?",
+    reported: "Paldies, mēs apskatīsimies.",
+    anon: "Anonīms",
+    privacy: "Bez reģistrācijas un personas datiem. Lūdzu, nedalies ar tālruņa numuriem vai privātu informāciju.",
+    noTable: "Noskenē QR kodu uz sava galda, lai redzētu tā zīmītes.",
+    loading: "Atveram galdu…"
+  },
+  ru: {
+    table: "Столик {n}",
+    intro: "До тебя здесь сидели незнакомцы. Вот что они оставили.",
+    empty: "Пока ни одной записки. Оставь след первым.",
+    composeTitle: "Оставь записку тому, кто сядет здесь следующим",
+    placeholder: "История, совет, секрет, привет…",
+    nick: "Имя или ник (необязательно)",
+    send: "Оставить здесь",
+    sent: "Твоя записка здесь. Кто-нибудь её найдёт.",
+    pending: "Спасибо! Записка появится после быстрой проверки.",
+    tooFast: "Не спеши — подожди несколько секунд перед следующей запиской.",
+    blocked: "Давай по-доброму — попробуй другие слова.",
+    noContacts: "Пожалуйста, без номеров телефонов и ссылок.",
+    error: "Что-то пошло не так. Попробуй ещё раз.",
+    report: "Пожаловаться",
+    reportSure: "Точно?",
+    reported: "Спасибо, мы посмотрим.",
+    anon: "Аноним",
+    privacy: "Без регистрации и личных данных. Пожалуйста, не публикуй номера телефонов и личную информацию.",
+    noTable: "Отсканируй QR-код на своём столике, чтобы увидеть записки.",
+    loading: "Открываем столик…"
+  },
+  tr: {
+    table: "Masa {n}",
+    intro: "Senden önce burada yabancılar oturdu. İşte geride bıraktıkları.",
+    empty: "Henüz not yok. İz bırakan ilk kişi sen ol.",
+    composeTitle: "Buraya sonra oturacak kişiye bir not bırak",
+    placeholder: "Bir hikâye, bir tavsiye, bir sır, bir merhaba…",
+    nick: "İsim ya da takma ad (isteğe bağlı)",
+    send: "Buraya bırak",
+    sent: "Notun artık burada. Biri onu bulacak.",
+    pending: "Teşekkürler! Notun kısa bir kontrolden sonra görünecek.",
+    tooFast: "Yavaş — bir sonraki not için birkaç saniye bekle.",
+    blocked: "Nazik kalalım — başka kelimelerle dene.",
+    noContacts: "Lütfen telefon numarası ya da link paylaşma.",
+    error: "Bir şeyler ters gitti. Tekrar dene.",
+    report: "Bildir",
+    reportSure: "Emin misin?",
+    reported: "Teşekkürler, bakacağız.",
+    anon: "Anonim",
+    privacy: "Kayıt yok, kişisel veri yok. Lütfen telefon numarası ya da özel bilgi paylaşma.",
+    noTable: "Notları görmek için masandaki QR kodu okut.",
+    loading: "Masa açılıyor…"
+  }
+};
+
+export function pickLang() {
+  const saved = (() => { try { return localStorage.getItem("ag_lang"); } catch { return null; } })();
+  if (saved && LANGS.includes(saved)) return saved;
+  const nav = (navigator.language || "en").slice(0, 2).toLowerCase();
+  return LANGS.includes(nav) ? nav : "en";
+}
+
+export function saveLang(l) {
+  try { localStorage.setItem("ag_lang", l); } catch {}
+}

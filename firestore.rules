@@ -1,0 +1,79 @@
+rules_version = '2';
+
+// Afterglow — Firestore security rules
+// Paste into Firebase Console → Firestore Database → Rules → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    function needsApproval(barId) {
+      let p = /databases/$(database)/documents/bars/$(barId);
+      return exists(p) && get(p).data.get('requireApproval', false) == true;
+    }
+
+    function validNewNote(barId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['table', 'text', 'nick', 'mood', 'status', 'reportCount', 'createdAt', 'uid'])
+        && d.keys().hasAll(['table', 'text', 'status', 'reportCount', 'createdAt', 'uid'])
+        && d.table is string && d.table.size() > 0 && d.table.size() <= 10
+        && d.text is string && d.text.size() >= 1 && d.text.size() <= 280
+        && (!('nick' in d) || (d.nick is string && d.nick.size() <= 24))
+        && (!('mood' in d) || (d.mood is string && d.mood.size() <= 8))
+        && ((needsApproval(barId) && d.status == 'pending')
+            || (!needsApproval(barId) && d.status == 'visible'))
+        && d.reportCount == 0
+        && d.createdAt == request.time
+        && d.uid == request.auth.uid
+        // must be written in the same batch as a rate-limit stamp (max 1 note / 30 s)
+        && getAfter(/databases/$(database)/documents/rateLimits/$(request.auth.uid)).data.last == request.time;
+    }
+
+    function validReport(barId, noteId) {
+      let r = /databases/$(database)/documents/bars/$(barId)/notes/$(noteId)/reports/$(request.auth.uid);
+      return signedIn()
+        && resource.data.status == 'visible'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['reportCount'])
+        && request.resource.data.reportCount == resource.data.reportCount + 1
+        && !exists(r) && existsAfter(r);
+    }
+
+    // Admin list: documents are created by hand in the console (doc id = admin's uid)
+    match /admins/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false;
+    }
+
+    match /bars/{barId} {
+      allow read: if true;
+      allow write: if isAdmin();
+
+      match /notes/{noteId} {
+        allow read: if resource.data.status == 'visible' || isAdmin();
+        allow create: if signedIn() && validNewNote(barId);
+        allow update: if isAdmin() || validReport(barId, noteId);
+        allow delete: if isAdmin();
+
+        match /reports/{uid} {
+          allow create: if signedIn() && request.auth.uid == uid
+            && request.resource.data.keys().hasOnly(['createdAt'])
+            && request.resource.data.createdAt == request.time;
+          allow read, delete: if isAdmin();
+        }
+      }
+    }
+
+    match /rateLimits/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['last'])
+        && request.resource.data.last == request.time
+        && (resource == null || request.time > resource.data.last + duration.value(30, 's'));
+    }
+  }
+}
