@@ -345,7 +345,10 @@ onAuthStateChanged(auth, (u) => {
 });
 
 try {
-  await signInAnonymously(auth);
+  // Keep any existing session (e.g. the admin's Google login on this phone);
+  // only create an anonymous one when nobody is signed in.
+  await auth.authStateReady();
+  if (!auth.currentUser) await signInAnonymously(auth);
 } catch (e) {
   console.error("Anonymous sign-in failed — is it enabled in Firebase Auth?", e);
   toast(t("error"));
