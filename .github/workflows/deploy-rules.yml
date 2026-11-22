@@ -3,7 +3,7 @@ name: Deploy Firestore rules
 on:
   push:
     branches: [main]
-    paths: [firestore.rules, firebase.json, .github/workflows/deploy-rules.yml]
+    paths: [firestore.rules, firebase.json, .github/workflows/deploy-rules.yml, .github/scripts/deploy-rules.mjs]
   workflow_dispatch:
 
 jobs:
@@ -29,13 +29,7 @@ jobs:
         if: steps.check.outputs.ok == 'true'
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          FIREBASE_PROJECT: after-glow-42465
         run: |
-          set +e
-          npx --yes firebase-tools@latest deploy --only firestore:rules --project after-glow-42465 --non-interactive > "$RUNNER_TEMP/out.txt" 2>&1
-          code=$?
-          cat "$RUNNER_TEMP/out.txt"
-          if [ $code -ne 0 ]; then
-            # surface the error as an annotation (visible without opening logs)
-            grep -iE "error|denied|permission|not enabled|enable|invalid|failed" "$RUNNER_TEMP/out.txt" | tail -n 8 | tr -d '\r' | sed 's/%/%25/g' | while IFS= read -r line; do echo "::error::$line"; done
-            exit $code
-          fi
+          npm install --no-save --silent google-auth-library@9
+          node .github/scripts/deploy-rules.mjs
