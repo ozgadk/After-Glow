@@ -2,6 +2,7 @@ import { firebaseConfig, DEFAULT_BAR, HIDE_AFTER_REPORTS, SDK } from "./firebase
 import { STRINGS, LANGS, pickLang, saveLang } from "./i18n.js";
 import { checkText } from "./filter.js";
 import { processPhoto, looksSafe, warmSafetyModel } from "./photo.js";
+import { MOODS as PAINT_MOODS, MOOD_KEYS, nightId } from "./painting.js";
 
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, signInAnonymously, onAuthStateChanged } = await import(`${SDK}/firebase-auth.js`);
@@ -18,6 +19,7 @@ const db = getFirestore(fbApp);
 const params = new URLSearchParams(location.search);
 const barId = (params.get("bar") || DEFAULT_BAR).toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40);
 const table = (params.get("t") || params.get("masa") || "").replace(/[^A-Za-z0-9-]/g, "").slice(0, 10);
+const paintOnly = params.get("paint") === "1" && !table;
 
 // ---- i18n ----
 let lang = pickLang();
@@ -55,6 +57,7 @@ let notes = [];
 let user = null;
 let mood = "";
 let photo = null; // { dataUrl, canvas }
+let paintMood = "joy";
 const photoCache = new Map();
 const MOODS = ["✨", "🍷", "💛", "😂", "🌙", "🎶"];
 
@@ -122,6 +125,11 @@ function render() {
   const app = document.getElementById("app");
 
   if (!table) {
+    if (paintOnly) {
+      app.innerHTML = `<h1 class="table-name">✦</h1><section id="paint"></section>`;
+      renderPaint();
+      return;
+    }
     app.innerHTML = `<h1 class="table-name">✦</h1><p class="intro"></p>`;
     app.querySelector(".intro").textContent = t("noTable");
     return;
@@ -134,6 +142,7 @@ function render() {
   app.innerHTML = `
     <h1 class="table-name"></h1>
     <p class="intro"></p>
+    <section id="paint"></section>
     <section class="notes" id="notes"></section>
     <section class="compose">
       <h2></h2>
@@ -194,8 +203,61 @@ function render() {
     } catch (e) { console.error(e); toast(t("photoError")); }
   };
   renderPreview();
+  renderPaint();
 
   renderNotes();
+}
+
+function renderPaint() {
+  const el = document.getElementById("paint");
+  if (!el) return;
+  const draft = document.getElementById("pword")?.value || "";
+  el.className = "paint";
+  el.innerHTML = `<h2></h2><p class="hint"></p><div class="swatches" id="sw"></div>
+    <div class="paint-row"><input id="pword" maxlength="20" autocomplete="off"><button class="send" id="psend"></button></div>`;
+  el.querySelector("h2").textContent = t("paintTitle");
+  el.querySelector(".hint").textContent = t("paintHint");
+  const sw = el.querySelector("#sw");
+  for (const k of MOOD_KEYS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "sw" + (k === paintMood ? " on" : "");
+    b.style.setProperty("--c", PAINT_MOODS[k].colors[0]);
+    b.textContent = `${PAINT_MOODS[k].emoji} ${t("mood_" + k)}`;
+    b.onclick = () => { paintMood = k; renderPaint(); };
+    sw.appendChild(b);
+  }
+  const inp = el.querySelector("#pword");
+  inp.placeholder = t("paintPlaceholder");
+  inp.value = draft;
+  const btn = el.querySelector("#psend");
+  btn.textContent = t("paintSend");
+  inp.onkeydown = (e) => { if (e.key === "Enter") sendWord(); };
+  btn.onclick = sendWord;
+}
+
+async function sendWord() {
+  const inp = document.getElementById("pword");
+  const word = inp.value.trim().replace(/\s+/g, " ");
+  if (!word || !user) return;
+  const problem = checkText(word);
+  if (problem) { toast(t(problem)); return; }
+  const btn = document.getElementById("psend");
+  btn.disabled = true;
+  const batch = writeBatch(db);
+  const data = { word, color: paintMood, createdAt: serverTimestamp(), uid: user.uid };
+  if (table) data.table = table;
+  batch.set(doc(collection(db, "bars", barId, "nights", nightId(), "strokes")), data);
+  batch.set(doc(db, "strokeLimits", user.uid), { last: serverTimestamp() });
+  try {
+    await batch.commit();
+    inp.value = "";
+    toast(t("painted"));
+  } catch (e) {
+    console.error(e);
+    toast(e.code === "permission-denied" ? t("paintTooFast") : t("error"));
+  }
+  btn.disabled = false;
 }
 
 function renderPreview() {
@@ -358,3 +420,4 @@ if (table) {
   await loadBar();
   listen();
 }
+if (paintOnly) render();

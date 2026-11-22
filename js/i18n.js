@@ -2,6 +2,13 @@ export const LANGS = ["en", "lv", "ru", "tr"];
 
 export const STRINGS = {
   en: {
+    paintTitle: "🎨 Add a word to tonight's painting",
+    paintHint: "It turns into brushstrokes on the bar screen.",
+    paintPlaceholder: "One word…",
+    paintSend: "Paint it",
+    painted: "Look at the screen ✦",
+    paintTooFast: "One word every few seconds — let the paint dry!",
+    mood_joy: "Joy", mood_love: "Love", mood_dream: "Dreamy", mood_calm: "Calm", mood_wild: "Wild", mood_gold: "Nostalgic",
     addPhoto: "📷 Add a photo",
     removePhoto: "Remove photo",
     processing: "Developing your photo…",
@@ -30,6 +37,13 @@ export const STRINGS = {
     loading: "Opening the table…"
   },
   lv: {
+    paintTitle: "🎨 Pievieno vārdu šīvakara gleznai",
+    paintHint: "Tas pārvēršas otas triepienos uz bāra ekrāna.",
+    paintPlaceholder: "Viens vārds…",
+    paintSend: "Uzgleznot",
+    painted: "Paskaties uz ekrānu ✦",
+    paintTooFast: "Viens vārds ik pēc dažām sekundēm — ļauj krāsai nožūt!",
+    mood_joy: "Prieks", mood_love: "Mīlestība", mood_dream: "Sapņains", mood_calm: "Miers", mood_wild: "Trakums", mood_gold: "Nostalģija",
     addPhoto: "📷 Pievienot foto",
     removePhoto: "Noņemt foto",
     processing: "Attīstām tavu foto…",
@@ -58,6 +72,13 @@ export const STRINGS = {
     loading: "Atveram galdu…"
   },
   ru: {
+    paintTitle: "🎨 Добавь слово в сегодняшнюю картину",
+    paintHint: "Оно превратится в мазки кисти на экране бара.",
+    paintPlaceholder: "Одно слово…",
+    paintSend: "Нарисовать",
+    painted: "Посмотри на экран ✦",
+    paintTooFast: "Одно слово раз в несколько секунд — дай краске высохнуть!",
+    mood_joy: "Радость", mood_love: "Любовь", mood_dream: "Мечта", mood_calm: "Покой", mood_wild: "Драйв", mood_gold: "Ностальгия",
     addPhoto: "📷 Добавить фото",
     removePhoto: "Убрать фото",
     processing: "Проявляем твоё фото…",
@@ -86,6 +107,13 @@ export const STRINGS = {
     loading: "Открываем столик…"
   },
   tr: {
+    paintTitle: "🎨 Bu gecenin tablosuna bir kelime ekle",
+    paintHint: "Bar ekranında fırça darbelerine dönüşür.",
+    paintPlaceholder: "Tek kelime…",
+    paintSend: "Boya",
+    painted: "Ekrana bak ✦",
+    paintTooFast: "Birkaç saniyede bir kelime — boya kurusun!",
+    mood_joy: "Neşe", mood_love: "Aşk", mood_dream: "Rüya", mood_calm: "Huzur", mood_wild: "Çılgın", mood_gold: "Nostalji",
     addPhoto: "📷 Fotoğraf ekle",
     removePhoto: "Fotoğrafı kaldır",
     processing: "Fotoğrafın banyo ediliyor…",

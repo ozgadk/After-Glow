@@ -72,6 +72,32 @@ service cloud.firestore {
         }
       }
 
+      // Living Painting: one word + mood per stroke, grouped by night (YYYY-MM-DD)
+      match /nights/{night}/strokes/{strokeId} {
+        allow read: if true;
+        allow create: if signedIn()
+          && night.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.resource.data.keys().hasOnly(['word', 'color', 'table', 'createdAt', 'uid'])
+          && request.resource.data.keys().hasAll(['word', 'color', 'createdAt', 'uid'])
+          && request.resource.data.word is string
+          && request.resource.data.word.size() >= 1 && request.resource.data.word.size() <= 20
+          && request.resource.data.color in ['joy', 'love', 'dream', 'calm', 'wild', 'gold']
+          && (!('table' in request.resource.data) || (request.resource.data.table is string && request.resource.data.table.size() <= 10))
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/strokeLimits/$(request.auth.uid)).data.last == request.time;
+        allow delete: if isAdmin();
+      }
+
+      // Saved nightly paintings (JPEG data URL), written by an admin's screen or panel
+      match /paintings/{night} {
+        allow read: if true;
+        allow write: if isAdmin()
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 950000;
+        allow delete: if isAdmin();
+      }
+
       // Photos live apart from notes so note lists stay light; loaded one by one.
       match /photos/{noteId} {
         allow read: if isAdmin()
@@ -87,6 +113,14 @@ service cloud.firestore {
           && !exists(/databases/$(database)/documents/bars/$(barId)/notes/$(noteId));
         allow delete: if isAdmin();
       }
+    }
+
+    match /strokeLimits/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow create, update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['last'])
+        && request.resource.data.last == request.time
+        && (resource == null || request.time > resource.data.last + duration.value(8, 's'));
     }
 
     match /rateLimits/{uid} {

@@ -155,3 +155,25 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .preview .remove {
   margin-top: 6px; background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 0;
 }
+
+/* living painting composer */
+.paint {
+  margin: 0 0 30px; padding: 16px; border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(255,179,107,0.12), rgba(255,111,142,0.10));
+  border: 1px solid rgba(255,179,107,0.25);
+}
+.paint h2 { font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 19px; margin: 0; }
+.paint .hint { color: var(--muted); font-size: 13px; margin: 4px 0 12px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.sw {
+  border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.25); color: #f6e9e2;
+  border-radius: 999px; padding: 6px 10px; font-size: 13px; cursor: pointer;
+  box-shadow: inset 3px 0 0 var(--c);
+}
+.sw.on { background: var(--c); color: var(--night); font-weight: 600; border-color: var(--c); }
+.paint-row { display: flex; gap: 8px; margin-top: 12px; }
+.paint-row input {
+  flex: 1; min-width: 0; border: none; outline: none; background: var(--paper); color: var(--ink);
+  border-radius: 999px; padding: 11px 16px; font-family: "Caveat", cursive; font-size: 22px;
+}
+.paint-row .send { padding: 11px 18px; }

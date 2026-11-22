@@ -9,14 +9,22 @@ Includes photos: resized on the phone, given the warm "Afterglow" tone, EXIF/GPS
 checked on-device for nudity (nsfw.js), stored in `bars/{barId}/photos/{noteId}` and always
 held for admin approval.
 
-Next: Living Painting (AI-generated shared artwork on the bar screen), AR wall gallery.
+**Phase 2:** Living Painting. Guests pick a mood colour and send one word; on the bar
+screen each word becomes glowing brush strokes along a flow field unique to that night.
+Rendering is deterministic (seeded by word + night), so a reload rebuilds the same
+painting. Nights roll over at 06:00 Riga time. An admin signed in on the screen device
+auto-saves the painting every 15 min to `bars/{barId}/paintings/{YYYY-MM-DD}`.
+
+Next: AR wall gallery.
 
 ## Pages
 
 | URL | What |
 |---|---|
 | `index.html?bar=snuggest&t=5` | Guest page for table 5 (this is what the QR code opens) |
-| `admin.html?bar=snuggest` | Moderation: approve / hide / delete notes, approval mode |
+| `admin.html?bar=snuggest` | Moderation: notes, tonight's painting words, saved paintings |
+| `screen.html?bar=snuggest` | Living Painting for the bar TV (tap once → fullscreen, screen stays awake) |
+| `index.html?bar=snuggest&paint=1` | Painting-only page (QR on the bar screen) |
 
 ## Stack
 
