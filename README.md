@@ -5,6 +5,10 @@ left by strangers who sat there before, and leave one for whoever comes next.
 No app download, no sign-up.
 
 **Phase 1 (this version):** table notes  
+Includes photos: resized on the phone, given the warm "Afterglow" tone, EXIF/GPS stripped,
+checked on-device for nudity (nsfw.js), stored in `bars/{barId}/photos/{noteId}` and always
+held for admin approval.
+
 Next: Living Painting (AI-generated shared artwork on the bar screen), AR wall gallery.
 
 ## Pages
@@ -43,6 +47,7 @@ reports are hidden from guests until an admin reviews them.
 
 ## Notes
 
-- Photo uploads are left out of v1: Firebase Storage needs the paid Blaze plan.
+- Photos are stored in Firestore (free Spark plan) instead of Storage, which needs Blaze.
+  Move to Storage + Cloud Vision SafeSearch when going multi-venue.
 - The word filter is client-side and can be bypassed; reports + the admin panel
   (and approval mode) are the real safety net.

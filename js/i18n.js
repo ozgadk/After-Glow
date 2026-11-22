@@ -2,6 +2,12 @@ export const LANGS = ["en", "lv", "ru", "tr"];
 
 export const STRINGS = {
   en: {
+    addPhoto: "📷 Add a photo",
+    removePhoto: "Remove photo",
+    processing: "Developing your photo…",
+    photoPending: "Thanks! Photos appear after a quick check by the bar.",
+    photoBlocked: "This photo can't be shared here.",
+    photoError: "Couldn't use this photo. Try another one.",
     table: "Table {n}",
     intro: "Strangers sat here before you. Here's what they left behind.",
     empty: "No notes yet. Be the first to leave a trace.",
@@ -24,6 +30,12 @@ export const STRINGS = {
     loading: "Opening the table…"
   },
   lv: {
+    addPhoto: "📷 Pievienot foto",
+    removePhoto: "Noņemt foto",
+    processing: "Attīstām tavu foto…",
+    photoPending: "Paldies! Foto parādās pēc ātras bāra pārbaudes.",
+    photoBlocked: "Šo foto šeit nevar publicēt.",
+    photoError: "Neizdevās izmantot šo foto. Pamēģini citu.",
     table: "Galds {n}",
     intro: "Pirms tevis šeit sēdēja svešinieki. Lūk, ko viņi atstāja.",
     empty: "Vēl nav nevienas zīmītes. Esi pirmais, kas atstāj pēdas.",
@@ -46,6 +58,12 @@ export const STRINGS = {
     loading: "Atveram galdu…"
   },
   ru: {
+    addPhoto: "📷 Добавить фото",
+    removePhoto: "Убрать фото",
+    processing: "Проявляем твоё фото…",
+    photoPending: "Спасибо! Фото появится после быстрой проверки баром.",
+    photoBlocked: "Это фото нельзя здесь опубликовать.",
+    photoError: "Не удалось использовать это фото. Попробуй другое.",
     table: "Столик {n}",
     intro: "До тебя здесь сидели незнакомцы. Вот что они оставили.",
     empty: "Пока ни одной записки. Оставь след первым.",
@@ -68,6 +86,12 @@ export const STRINGS = {
     loading: "Открываем столик…"
   },
   tr: {
+    addPhoto: "📷 Fotoğraf ekle",
+    removePhoto: "Fotoğrafı kaldır",
+    processing: "Fotoğrafın banyo ediliyor…",
+    photoPending: "Teşekkürler! Fotoğraflar barın kısa kontrolünden sonra görünür.",
+    photoBlocked: "Bu fotoğraf burada paylaşılamaz.",
+    photoError: "Bu fotoğraf kullanılamadı. Başka bir tane dene.",
     table: "Masa {n}",
     intro: "Senden önce burada yabancılar oturdu. İşte geride bıraktıkları.",
     empty: "Henüz not yok. İz bırakan ilk kişi sen ol.",

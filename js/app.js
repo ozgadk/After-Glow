@@ -1,6 +1,7 @@
 import { firebaseConfig, DEFAULT_BAR, HIDE_AFTER_REPORTS, SDK } from "./firebase-config.js";
 import { STRINGS, LANGS, pickLang, saveLang } from "./i18n.js";
 import { checkText } from "./filter.js";
+import { processPhoto, looksSafe, warmSafetyModel } from "./photo.js";
 
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, signInAnonymously, onAuthStateChanged } = await import(`${SDK}/firebase-auth.js`);
@@ -53,6 +54,8 @@ function toast(msg) {
 let notes = [];
 let user = null;
 let mood = "";
+let photo = null; // { dataUrl, canvas }
+const photoCache = new Map();
 const MOODS = ["✨", "🍷", "💛", "😂", "🌙", "🎶"];
 
 function timeAgo(ts) {
@@ -101,7 +104,15 @@ function noteEl(n) {
   };
 
   meta.append(who, rep);
-  card.append(text, meta);
+  if (n.hasPhoto) {
+    const img = document.createElement("img");
+    img.className = "photo";
+    img.alt = "";
+    card.appendChild(img);
+    loadPhoto(n.id).then((src) => { if (src) img.src = src; else img.remove(); });
+  }
+  if (n.text || n.mood) card.appendChild(text);
+  card.append(meta);
   return card;
 }
 
@@ -127,6 +138,10 @@ function render() {
     <section class="compose">
       <h2></h2>
       <textarea id="text" maxlength="280"></textarea>
+      <div class="photo-pick">
+        <label class="pick-btn"><input type="file" id="file" accept="image/*" hidden><span id="pickLabel"></span></label>
+        <div id="preview" class="preview"></div>
+      </div>
       <div class="moods" id="moods"></div>
       <input id="nick" maxlength="24" autocomplete="off">
       <div class="row" style="margin-top:14px">
@@ -149,7 +164,7 @@ function render() {
   const count = app.querySelector("#count");
   const send = app.querySelector("#send");
   send.textContent = t("send");
-  const upd = () => { count.textContent = `${ta.value.length}/280`; send.disabled = !ta.value.trim() || !user; };
+  const upd = () => { count.textContent = `${ta.value.length}/280`; send.disabled = !(ta.value.trim() || photo) || !user; };
   ta.oninput = upd;
   upd();
   send.onclick = submit;
@@ -164,7 +179,47 @@ function render() {
     moodsEl.appendChild(b);
   }
 
+  app.querySelector("#pickLabel").textContent = t("addPhoto");
+  const file = app.querySelector("#file");
+  file.onchange = async () => {
+    const f = file.files[0];
+    file.value = "";
+    if (!f) return;
+    warmSafetyModel();
+    toast(t("processing"));
+    try {
+      photo = await processPhoto(f);
+      renderPreview();
+      upd();
+    } catch (e) { console.error(e); toast(t("photoError")); }
+  };
+  renderPreview();
+
   renderNotes();
+}
+
+function renderPreview() {
+  const el = document.getElementById("preview");
+  if (!el) return;
+  el.innerHTML = "";
+  if (!photo) return;
+  const img = document.createElement("img");
+  img.src = photo.dataUrl;
+  const x = document.createElement("button");
+  x.type = "button";
+  x.className = "remove";
+  x.textContent = "✕ " + t("removePhoto");
+  x.onclick = () => { photo = null; renderPreview(); document.getElementById("text").oninput(); };
+  el.append(img, x);
+}
+
+async function loadPhoto(noteId) {
+  if (photoCache.has(noteId)) return photoCache.get(noteId);
+  const p = getDoc(doc(db, "bars", barId, "photos", noteId))
+    .then((s) => (s.exists() ? s.data().data : null))
+    .catch(() => null);
+  photoCache.set(noteId, p);
+  return p;
 }
 
 function renderNotes() {
@@ -211,33 +266,49 @@ async function submit() {
   const nickEl = document.getElementById("nick");
   const text = ta.value.trim();
   const nick = nickEl.value.trim();
-  if (!text || !user) return;
+  if (!(text || photo) || !user) return;
 
-  const problem = checkText(text) || (nick && checkText(nick));
+  const problem = (text && checkText(text)) || (nick && checkText(nick));
   if (problem) { toast(t(problem)); return; }
 
   const send = document.getElementById("send");
   send.disabled = true;
 
+  if (photo && !(await looksSafe(photo.canvas))) {
+    toast(t("photoBlocked"));
+    photo = null;
+    renderPreview();
+    send.disabled = false;
+    return;
+  }
+  const withPhoto = !!photo;
+
   const batch = writeBatch(db);
   const noteRef = doc(collection(db, "bars", barId, "notes"));
   const data = {
     table, text,
-    status: requireApproval ? "pending" : "visible",
+    status: requireApproval || withPhoto ? "pending" : "visible",
     reportCount: 0,
     createdAt: serverTimestamp(),
     uid: user.uid
   };
   if (nick) data.nick = nick;
   if (mood) data.mood = mood;
+  if (withPhoto) data.hasPhoto = true;
   batch.set(noteRef, data);
+  if (withPhoto) {
+    batch.set(doc(db, "bars", barId, "photos", noteRef.id), {
+      data: photo.dataUrl, createdAt: serverTimestamp(), uid: user.uid
+    });
+  }
   batch.set(doc(db, "rateLimits", user.uid), { last: serverTimestamp() });
 
   try {
     await batch.commit();
     ta.value = "";
     mood = "";
-    toast(requireApproval ? t("pending") : t("sent"));
+    photo = null;
+    toast(withPhoto ? t("photoPending") : requireApproval ? t("pending") : t("sent"));
     render();
   } catch (e) {
     console.error(e);
@@ -270,7 +341,7 @@ onAuthStateChanged(auth, (u) => {
   user = u;
   const send = document.getElementById("send");
   const ta = document.getElementById("text");
-  if (send && ta) send.disabled = !ta.value.trim() || !user;
+  if (send && ta) send.disabled = !(ta.value.trim() || photo) || !user;
 });
 
 try {

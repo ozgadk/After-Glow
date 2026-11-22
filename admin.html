@@ -118,20 +118,36 @@ function renderList() {
     el.className = "item";
     const when = n.createdAt ? n.createdAt.toDate().toLocaleString() : "";
     el.innerHTML = `
-      <div>${esc(n.mood || "")} ${esc(n.text)}</div>
+      <div>${esc(n.mood || "")} ${esc(n.text)} ${n.hasPhoto ? "📷" : ""}</div>
       <div class="meta">Table <b>${esc(n.table)}</b> · ${esc(n.nick || "Anonymous")} · ${esc(when)}
         ${n.status !== "visible" ? `<span class="badge ${esc(n.status)}">${esc(n.status)}</span>` : ""}
         ${n.reportCount ? `<span class="badge rep">⚑ ${n.reportCount}</span>` : ""}</div>
       <div class="actions"></div>`;
+    if (n.hasPhoto) {
+      const img = document.createElement("img");
+      img.style.cssText = "display:block;width:100%;max-width:420px;border-radius:8px;margin:8px 0";
+      el.insertBefore(img, el.querySelector(".meta"));
+      loadPhoto(n.id).then((src) => { if (src) img.src = src; });
+    }
     const acts = el.querySelector(".actions");
     const add = (label, cls, fn) => { const b = document.createElement("button"); b.className = "btn " + cls; b.textContent = label; b.onclick = fn; acts.appendChild(b); };
     const ref = doc(db, "bars", barId, "notes", n.id);
     if (n.status !== "visible") add("✓ Show", "", () => updateDoc(ref, { status: "visible", reportCount: 0 }));
     if (n.status === "visible" && n.reportCount) add("✓ Keep (clear reports)", "", () => updateDoc(ref, { reportCount: 0 }));
     if (n.status !== "hidden") add("Hide", "", () => updateDoc(ref, { status: "hidden" }));
-    add("Delete", "danger", () => { if (confirm("Delete this note forever?")) deleteDoc(ref); });
+    add("Delete", "danger", async () => {
+      if (!confirm("Delete this note forever?")) return;
+      if (n.hasPhoto) await deleteDoc(doc(db, "bars", barId, "photos", n.id)).catch(() => {});
+      await deleteDoc(ref);
+    });
     $("#list").appendChild(el);
   }
+}
+
+const photoCache = new Map();
+function loadPhoto(id) {
+  if (!photoCache.has(id)) photoCache.set(id, getDoc(doc(db, "bars", barId, "photos", id)).then((s) => s.exists() ? s.data().data : null).catch(() => null));
+  return photoCache.get(id);
 }
 
 $("#out").onclick = () => signOut(auth);

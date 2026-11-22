@@ -19,14 +19,19 @@ service cloud.firestore {
 
     function validNewNote(barId) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['table', 'text', 'nick', 'mood', 'status', 'reportCount', 'createdAt', 'uid'])
+      let photo = /databases/$(database)/documents/bars/$(barId)/photos/$(request.resource.id);
+      let withPhoto = d.get('hasPhoto', false) == true;
+      return d.keys().hasOnly(['table', 'text', 'nick', 'mood', 'status', 'reportCount', 'createdAt', 'uid', 'hasPhoto'])
         && d.keys().hasAll(['table', 'text', 'status', 'reportCount', 'createdAt', 'uid'])
         && d.table is string && d.table.size() > 0 && d.table.size() <= 10
-        && d.text is string && d.text.size() >= 1 && d.text.size() <= 280
+        && d.text is string && d.text.size() <= 280
+        && (d.text.size() >= 1 || withPhoto)
+        // photo notes are always reviewed first, and must arrive with their photo
+        && (!withPhoto || (d.status == 'pending' && existsAfter(photo)))
         && (!('nick' in d) || (d.nick is string && d.nick.size() <= 24))
         && (!('mood' in d) || (d.mood is string && d.mood.size() <= 8))
-        && ((needsApproval(barId) && d.status == 'pending')
-            || (!needsApproval(barId) && d.status == 'visible'))
+        && (((needsApproval(barId) || withPhoto) && d.status == 'pending')
+            || (!needsApproval(barId) && !withPhoto && d.status == 'visible'))
         && d.reportCount == 0
         && d.createdAt == request.time
         && d.uid == request.auth.uid
@@ -65,6 +70,22 @@ service cloud.firestore {
             && request.resource.data.createdAt == request.time;
           allow read, delete: if isAdmin();
         }
+      }
+
+      // Photos live apart from notes so note lists stay light; loaded one by one.
+      match /photos/{noteId} {
+        allow read: if isAdmin()
+          || get(/databases/$(database)/documents/bars/$(barId)/notes/$(noteId)).data.status == 'visible';
+        allow create: if signedIn()
+          && request.resource.data.keys().hasOnly(['data', 'createdAt', 'uid'])
+          && request.resource.data.data is string
+          && request.resource.data.data.size() <= 900000
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.uid == request.auth.uid
+          && getAfter(/databases/$(database)/documents/bars/$(barId)/notes/$(noteId)).data.get('hasPhoto', false) == true
+          && getAfter(/databases/$(database)/documents/bars/$(barId)/notes/$(noteId)).data.uid == request.auth.uid
+          && !exists(/databases/$(database)/documents/bars/$(barId)/notes/$(noteId));
+        allow delete: if isAdmin();
       }
     }
 

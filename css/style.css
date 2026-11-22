@@ -140,3 +140,18 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .privacy { margin-top: 28px; color: #8f7a72; font-size: 12px; text-align: center; line-height: 1.5; }
 
 .loading { color: var(--muted); text-align: center; padding: 60px 0; }
+
+/* photos */
+.note .photo {
+  display: block; width: 100%; border-radius: 4px; margin: 2px 0 12px;
+  background: #e9d6c3; min-height: 120px; object-fit: cover;
+}
+.photo-pick { margin-top: 10px; }
+.pick-btn {
+  display: inline-block; cursor: pointer; font-size: 15px; color: var(--amber);
+  border: 1px dashed rgba(255, 179, 107, 0.5); border-radius: 12px; padding: 9px 14px;
+}
+.preview img { display: block; width: 100%; border-radius: 10px; margin-top: 10px; }
+.preview .remove {
+  margin-top: 6px; background: none; border: none; color: var(--muted); font-size: 13px; cursor: pointer; padding: 4px 0;
+}
