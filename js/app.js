@@ -394,7 +394,7 @@ function renderKeepsakes() {
         const blob = await makePostcard({
           image: k.image, words: k.round.words || [], mine: myWords, n: r,
           count: k.round.count || (k.round.words || []).length, barName, date,
-          line: t("postcardLine", { n: k.round.count || "" })
+          line: t("postcardLine", { n: others })
         });
         const file = new File([blob], `afterglow-${barId}-${r}.jpg`, { type: "image/jpeg" });
         if (navigator.canShare?.({ files: [file] })) {

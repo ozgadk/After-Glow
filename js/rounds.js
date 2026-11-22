@@ -140,44 +140,60 @@ export async function makePostcard({ image, words, mine, n, count, barName, date
   x.fillStyle = "#c9b3a8"; x.font = '400 28px "Inter", sans-serif';
   x.fillText(`${barName} · Rīga · ${date}`.toUpperCase(), 80, 200);
 
-  // image on "paper" with tape
+  // image on "paper" with tape — cropped to 4:5 so it fills the card
   const img = await loadImg(image);
-  const pw = 920, ph = Math.round(pw * (img.height / img.width));
+  const pw = 900, ph = 1000;
+  const top = 270;
   x.save();
-  x.translate(540, 290 + ph / 2 + 20);
+  x.translate(540, top + ph / 2);
   x.rotate(-0.018);
   x.fillStyle = "#fff3e0";
   x.shadowColor = "rgba(0,0,0,0.5)"; x.shadowBlur = 40; x.shadowOffsetY = 16;
   x.fillRect(-pw / 2 - 22, -ph / 2 - 22, pw + 44, ph + 44);
   x.shadowColor = "transparent";
-  x.drawImage(img, -pw / 2, -ph / 2, pw, ph);
+  const sc = Math.max(pw / img.width, ph / img.height);
+  const sw = pw / sc, sh = ph / sc;
+  x.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, -pw / 2, -ph / 2, pw, ph);
   x.fillStyle = "rgba(255,200,150,0.75)";
   x.fillRect(-90, -ph / 2 - 44, 180, 46);
   x.restore();
 
-  let y = 290 + ph + 150;
-  x.fillStyle = "#ffd2a8"; x.font = '500 58px "Caveat", cursive';
-  x.fillText(line, 80, y);
-  x.fillStyle = "#8f7a72"; x.font = '400 26px "Inter", sans-serif';
-  x.fillText(`#${n} · ${count} words`, 80, y + 46);
-
-  // word cloud, mine highlighted
-  y += 120;
-  let cx = 80;
-  const maxX = 1000;
+  // text block: sized to the number of words, centred in the space left
+  const areaTop = top + ph + 60, areaBottom = 1820;
+  const n0 = words.length;
+  const base = n0 <= 6 ? 64 : n0 <= 12 ? 54 : n0 <= 20 ? 46 : 40;
+  const layout = [];
+  let lx = 0, ly = 0;
+  const lineH = Math.round(base * 1.45), maxW = 920;
   for (const w of words) {
     const isMine = mine.some((m) => m.toLowerCase() === String(w.w).toLowerCase());
-    const size = isMine ? 60 : 40 + (hashStr(w.w) % 12);
+    const size = isMine ? Math.round(base * 1.35) : base + (hashStr(w.w) % 8) - 4;
     x.font = `500 ${size}px "Caveat", cursive`;
     const tw = x.measureText(w.w).width;
-    if (cx + tw > maxX) { cx = 80; y += 70; }
-    if (y > 1820) break;
-    x.fillStyle = isMine ? "#ffb36b" : (MOODS[w.c]?.colors[1] || "#e6d3c8");
-    x.globalAlpha = isMine ? 1 : 0.8;
-    x.fillText(w.w, cx, y);
-    if (isMine) { x.fillRect(cx, y + 10, tw, 4); }
+    if (lx > 0 && lx + tw > maxW) { lx = 0; ly += lineH; }
+    layout.push({ w, isMine, size, x: lx, y: ly, tw });
+    lx += tw + 30;
+  }
+  const cloudH = (layout.length ? ly + lineH : 0);
+  const headH = 150;
+  const blockH = headH + cloudH;
+  let y0 = areaTop + Math.max(0, (areaBottom - areaTop - blockH) / 2);
+
+  x.fillStyle = "#ffd2a8"; x.font = '500 62px "Caveat", cursive';
+  x.fillText(line, 80, y0 + 60);
+  x.fillStyle = "#8f7a72"; x.font = '400 26px "Inter", sans-serif';
+  x.fillText(`#${n} · ${count} words`, 80, y0 + 104);
+
+  const cy = y0 + headH + base;
+  for (const L of layout) {
+    const yy = cy + L.y;
+    if (yy > areaBottom) break;
+    x.font = `500 ${L.size}px "Caveat", cursive`;
+    x.fillStyle = L.isMine ? "#ffb36b" : (MOODS[L.w.c]?.colors[1] || "#e6d3c8");
+    x.globalAlpha = L.isMine ? 1 : 0.85;
+    x.fillText(L.w.w, 80 + L.x, yy);
+    if (L.isMine) x.fillRect(80 + L.x, yy + 12, L.tw, 5);
     x.globalAlpha = 1;
-    cx += tw + 28;
   }
   x.fillStyle = "#6f5d57"; x.font = '400 22px "Inter", sans-serif';
   x.fillText("ozgadk.github.io/After-Glow", 80, 1880);
