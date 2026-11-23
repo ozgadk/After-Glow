@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#120a10">
+  <title>Afterglow · Wall Gallery</title>
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .hero { margin: 30px 0 18px; }
+    .hero h1 { font-family: "Fraunces", serif; font-weight: 500; font-size: 36px; line-height: 1.1; margin: 0 0 8px; }
+    .hero p { color: var(--muted); margin: 0; line-height: 1.5; }
+    .choices { display: grid; gap: 10px; margin: 22px 0 30px; }
+    .choices .send { width: 100%; }
+    .ghost { width: 100%; background: transparent; color: #f6e9e2; border: 1px solid rgba(255,255,255,0.2); border-radius: 999px; padding: 13px; font-size: 16px; cursor: pointer; }
+    .grid { display: grid; gap: 18px; }
+    .art { background: var(--paper); color: var(--ink); padding: 10px 10px 12px; border-radius: 4px 4px 4px 18px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); }
+    .art img { display: block; width: 100%; border-radius: 2px; }
+    .art .cap { font-family: "Caveat", cursive; font-size: 20px; line-height: 1.2; margin-top: 8px; }
+    .art .meta { font-size: 12px; color: #8a6d60; margin-top: 4px; }
+    .art:nth-child(odd) { transform: rotate(-0.8deg); } .art:nth-child(even) { transform: rotate(0.7deg); }
+    /* AR */
+    #ar { position: fixed; inset: 0; z-index: 20; background: #000; display: none; }
+    #ar.on { display: block; }
+    #ar a-scene { position: absolute; inset: 0; }
+    .arbar { position: fixed; left: 0; right: 0; top: 0; z-index: 30; display: none; justify-content: space-between; align-items: center; padding: 14px 16px; padding-top: max(14px, env(safe-area-inset-top)); }
+    .arbar.on { display: flex; }
+    .arbar .hint { color: #fff; font-family: "Caveat", cursive; font-size: 22px; text-shadow: 0 0 10px #000; }
+    .arbar button { background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
+    .view { position: fixed; inset: 0; z-index: 40; background: rgba(13,7,12,0.94); display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
+    .view.on { display: flex; }
+    .view img { max-width: 100%; max-height: 70vh; border: 10px solid var(--paper); }
+    .view p { font-family: "Caveat", cursive; font-size: 22px; color: #fff3e0; text-align: center; max-width: 520px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header><div class="logo">Afterglow</div><div class="langs" id="langs"></div></header>
+    <section class="hero"><h1 id="h1"></h1><p id="hp"></p></section>
+    <div class="choices">
+      <button class="send" id="startAR"></button>
+      <button class="ghost" id="browse"></button>
+    </div>
+    <section class="grid" id="grid"></section>
+    <p class="privacy" id="note"></p>
+  </div>
+
+  <div id="ar"></div>
+  <div class="arbar" id="arbar"><span class="hint" id="arhint"></span><button id="arclose">✕</button></div>
+  <div class="view" id="view"><img id="vimg" alt=""><p id="vcap"></p></div>
+  <div class="toast" id="toast"></div>
+
+<script type="module">
+import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
+import { LANGS, pickLang, saveLang } from "./js/i18n.js";
+const { initializeApp } = await import(`${SDK}/firebase-app.js`);
+const { getFirestore, collection, doc, getDoc, getDocs, query, where } = await import(`${SDK}/firebase-firestore.js`);
+
+const db = getFirestore(initializeApp(firebaseConfig));
+const barId = (new URLSearchParams(location.search).get("bar") || DEFAULT_BAR).toLowerCase().replace(/[^a-z0-9-]/g, "");
+const $ = (id) => document.getElementById(id);
+
+const T = {
+  en: { h1: "The wall remembers.", hp: "Paintings made together by strangers and photos left at the tables.", ar: "📷 Point at the poster (AR)", browse: "Just browse the gallery", hint: "Point at the Afterglow poster", empty: "The wall is still empty. Leave a word or a photo tonight ✦", note: "The camera is only used on your phone to find the poster. Nothing is recorded or uploaded.", painted: "Painted together by {n} strangers", arfail: "AR couldn't start here. You can still browse the gallery." },
+  lv: { h1: "Siena atceras.", hp: "Svešinieku kopā radītas gleznas un pie galdiem atstāti foto.", ar: "📷 Pavērs kameru pret plakātu (AR)", browse: "Vienkārši apskatīt galeriju", hint: "Pavērs kameru pret Afterglow plakātu", empty: "Siena vēl ir tukša. Atstāj šovakar vārdu vai foto ✦", note: "Kamera tiek izmantota tikai tavā telefonā, lai atrastu plakātu. Nekas netiek ierakstīts vai augšupielādēts.", painted: "Kopā uzgleznojuši {n} svešinieki", arfail: "AR šeit neizdevās palaist. Galeriju vari apskatīt arī tāpat." },
+  ru: { h1: "Стена помнит.", hp: "Картины, нарисованные незнакомцами вместе, и фото, оставленные за столиками.", ar: "📷 Наведи камеру на постер (AR)", browse: "Просто посмотреть галерею", hint: "Наведи камеру на постер Afterglow", empty: "Стена пока пуста. Оставь сегодня слово или фото ✦", note: "Камера используется только на твоём телефоне, чтобы найти постер. Ничего не записывается и не загружается.", painted: "Нарисовано вместе: {n} незнакомцев", arfail: "AR здесь не запустился. Галерею можно посмотреть и так." },
+  tr: { h1: "Duvar hatırlıyor.", hp: "Yabancıların birlikte yaptığı tablolar ve masalara bırakılan fotoğraflar.", ar: "📷 Kamerayı postere tut (AR)", browse: "Sadece galeriye bak", hint: "Kamerayı Afterglow posterine tut", empty: "Duvar henüz boş. Bu gece bir kelime ya da fotoğraf bırak ✦", note: "Kamera sadece posteri bulmak için telefonunda kullanılır. Hiçbir şey kaydedilmez ya da yüklenmez.", painted: "{n} yabancı birlikte boyadı", arfail: "AR burada başlatılamadı. Galeriye yine de bakabilirsin." }
+};
+let lang = pickLang();
+const t = (k, v = {}) => (T[lang][k] || T.en[k]).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? "");
+function applyLang() {
+  document.documentElement.lang = lang;
+  $("h1").textContent = t("h1"); $("hp").textContent = t("hp");
+  $("startAR").textContent = t("ar"); $("browse").textContent = t("browse");
+  $("arhint").textContent = t("hint"); $("note").textContent = t("note");
+  const el = $("langs"); el.innerHTML = "";
+  for (const l of LANGS) { const b = document.createElement("button"); b.textContent = l; if (l === lang) b.className = "on"; b.onclick = () => { lang = l; saveLang(l); applyLang(); renderGrid(); }; el.appendChild(b); }
+}
+function toast(m) { const e = $("toast"); e.textContent = m; e.classList.add("show"); setTimeout(() => e.classList.remove("show"), 3500); }
+
+// ---- content: latest finished paintings + approved photos ----
+let items = [];
+async function loadItems() {
+  const out = [];
+  try {
+    const rs = await getDocs(collection(db, "bars", barId, "rounds"));
+    const done = rs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status === "done").sort((a, b) => (b.n || 0) - (a.n || 0)).slice(0, 6);
+    for (const r of done) {
+      const im = await getDoc(doc(db, "bars", barId, "roundImages", r.id));
+      if (im.exists()) out.push({ kind: "painting", src: im.data().data, n: r.count || 0, words: (r.words || []).map((w) => w.w), ts: r.closedAt?.toMillis?.() || 0 });
+    }
+  } catch (e) { console.warn(e); }
+  try {
+    const ns = await getDocs(query(collection(db, "bars", barId, "notes"), where("status", "==", "visible"), where("hasPhoto", "==", true)));
+    const notes = ns.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)).slice(0, 6);
+    for (const n of notes) {
+      const ph = await getDoc(doc(db, "bars", barId, "photos", n.id));
+      if (ph.exists()) out.push({ kind: "photo", src: ph.data().data, text: n.text || "", who: n.nick || "", table: n.table, ts: n.createdAt?.toMillis?.() || 0 });
+    }
+  } catch (e) { console.warn(e); }
+  items = out.sort((a, b) => b.ts - a.ts);
+}
+
+const captionOf = (it) => it.kind === "painting"
+  ? `${t("painted", { n: it.n })} · ${it.words.slice(0, 8).join(" · ")}${it.words.length > 8 ? "…" : ""}`
+  : `${it.text}${it.who ? " — " + it.who : ""}`;
+
+function renderGrid() {
+  const g = $("grid"); g.innerHTML = "";
+  if (!items.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = t("empty"); g.appendChild(p); return; }
+  for (const it of items) {
+    const a = document.createElement("article"); a.className = "art";
+    a.innerHTML = `<img alt=""><div class="cap"></div>`;
+    a.querySelector("img").src = it.src;
+    a.querySelector(".cap").textContent = captionOf(it);
+    a.onclick = () => openView(it);
+    g.appendChild(a);
+  }
+}
+function openView(it) { $("vimg").src = it.src; $("vcap").textContent = captionOf(it); $("view").classList.add("on"); }
+$("view").onclick = () => $("view").classList.remove("on");
+
+// ---- AR (loaded only when asked) ----
+const addScript = (src) => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+let arLoaded = false;
+
+// frame slots around the poster (poster: width 1, height ≈1.414, centred at 0,0)
+const SLOTS = [
+  [-1.05, 0.45], [1.05, 0.45], [-1.05, -0.35], [1.05, -0.35],
+  [-0.45, 1.15], [0.45, 1.15], [-1.05, -1.1], [1.05, -1.1]
+];
+
+async function startAR() {
+  $("ar").classList.add("on"); $("arbar").classList.add("on");
+  try {
+    if (!arLoaded) {
+      await addScript("https://aframe.io/releases/1.5.0/aframe.min.js");
+      await addScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js");
+      arLoaded = true;
+    }
+    buildScene();
+  } catch (e) {
+    console.error(e); stopAR(); toast(t("arfail"));
+  }
+}
+
+function buildScene() {
+  const shown = items.slice(0, SLOTS.length);
+  let assets = "", frames = "";
+  shown.forEach((it, i) => {
+    assets += `<img id="ag${i}" src="${it.src}" crossorigin="anonymous">`;
+    const [x, y] = SLOTS[i];
+    const w = it.kind === "painting" ? 0.9 : 0.62;
+    const h = it.kind === "painting" ? w * 9 / 16 : w * 0.75;
+    const rot = ((i * 37) % 7) - 3;
+    frames += `
+      <a-entity position="${x} ${y} 0" rotation="0 0 ${rot}" scale="0.001 0.001 0.001"
+        animation__in="property: scale; to: 1 1 1; dur: 700; delay: ${150 * i}; easing: easeOutBack; startEvents: show"
+        animation__out="property: scale; to: 0.001 0.001 0.001; dur: 200; startEvents: hide"
+        class="frame">
+        <a-plane width="${w + 0.06}" height="${h + 0.06}" color="#fff3e0" position="0 0 -0.002" shader="flat"></a-plane>
+        <a-plane class="clickable" data-i="${i}" width="${w}" height="${h}" material="src: #ag${i}; shader: flat"></a-plane>
+        <a-plane width="0.16" height="0.045" color="#ffc896" opacity="0.85" position="0 ${h / 2 + 0.03} 0.001" rotation="0 0 -4" shader="flat"></a-plane>
+      </a-entity>`;
+  });
+  $("ar").innerHTML = `
+    <a-scene mindar-image="imageTargetSrc: assets/ar-target-${barId}.mind; uiError: no; uiLoading: yes; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001"
+      color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"
+      cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable">
+      <a-assets>${assets}</a-assets>
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      <a-entity mindar-image-target="targetIndex: 0" id="target">${frames}</a-entity>
+    </a-scene>`;
+  const target = $("target");
+  const frameEls = () => [...document.querySelectorAll(".frame")];
+  target.addEventListener("targetFound", () => { frameEls().forEach((f) => f.emit("show")); $("arhint").style.opacity = 0; });
+  target.addEventListener("targetLost", () => { frameEls().forEach((f) => f.emit("hide")); $("arhint").style.opacity = 1; });
+  document.querySelectorAll(".clickable").forEach((p) => p.addEventListener("click", () => openView(shown[+p.dataset.i])));
+  const scene = document.querySelector("a-scene");
+  scene.addEventListener("arError", () => { stopAR(); toast(t("arfail")); });
+}
+
+function stopAR() {
+  const scene = document.querySelector("#ar a-scene");
+  try { scene?.systems["mindar-image-system"]?.stop(); } catch {}
+  $("ar").innerHTML = ""; $("ar").classList.remove("on"); $("arbar").classList.remove("on");
+  document.querySelectorAll("video").forEach((v) => { v.srcObject?.getTracks?.().forEach((tr) => tr.stop()); v.remove(); });
+}
+
+$("startAR").onclick = startAR;
+$("arclose").onclick = stopAR;
+$("browse").onclick = () => $("grid").scrollIntoView({ behavior: "smooth" });
+
+applyLang();
+await loadItems();
+renderGrid();
+</script>
+</body>
+</html>

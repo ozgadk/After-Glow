@@ -24,7 +24,14 @@ Data: `bars/{barId}` `{currentRound, roundTarget}` ·
 `bars/{barId}/rounds/r{n}/strokes/*` · `bars/{barId}/rounds/r{n}` (words, prompt,
 status) · `bars/{barId}/roundImages/r{n}` (JPEG).
 
-Next: AR wall gallery.
+**Phase 3:** AR wall gallery (`gallery.html`). Point the phone at the Afterglow poster
+(`assets/ar-poster-snuggest.jpg`, compiled to `assets/ar-target-snuggest.mind` with
+MindAR 1.2.5) and the latest finished paintings and approved photos appear as framed
+pictures on the wall around it; tap one to view it. A-Frame and MindAR load from CDN
+only when AR is started. Without AR the same content shows as a scrolling gallery.
+
+To use a different poster image, it must be recompiled into a new `.mind` file and
+the printed poster must match that exact image.
 
 ## Pages
 
@@ -33,6 +40,7 @@ Next: AR wall gallery.
 | `index.html?bar=snuggest&t=5` | Guest page for table 5 (this is what the QR code opens) |
 | `admin.html?bar=snuggest` | Moderation: notes, tonight's painting words, saved paintings |
 | `screen.html?bar=snuggest` | Living Painting for the bar TV (tap once → fullscreen, screen stays awake) |
+| `gallery.html?bar=snuggest` | Wall gallery: AR on the poster, or plain browsing |
 | `index.html?bar=snuggest&paint=1` | Painting-only page (QR on the bar screen) |
 
 ## Stack
