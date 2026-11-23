@@ -122,8 +122,10 @@ function renderGrid() {
     g.appendChild(a);
   }
 }
-function openView(it) { $("vimg").src = it.src; $("vcap").textContent = captionOf(it); $("view").classList.add("on"); }
-$("view").onclick = () => $("view").classList.remove("on");
+let openedAt = 0;
+function openView(it) { $("vimg").src = it.src; $("vcap").textContent = captionOf(it); $("view").classList.add("on"); openedAt = Date.now(); }
+// ignore the tail of the same tap that opened the view (pointerup → click)
+$("view").onclick = () => { if (Date.now() - openedAt > 450) $("view").classList.remove("on"); };
 
 // ---- AR (loaded only when asked) ----
 const addScript = (src) => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
