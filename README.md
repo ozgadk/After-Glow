@@ -24,14 +24,17 @@ Data: `bars/{barId}` `{currentRound, roundTarget}` ·
 `bars/{barId}/rounds/r{n}/strokes/*` · `bars/{barId}/rounds/r{n}` (words, prompt,
 status) · `bars/{barId}/roundImages/r{n}` (JPEG).
 
-**Phase 3:** AR wall gallery (`gallery.html`). Point the phone at the Afterglow poster
-(`assets/ar-poster-snuggest.jpg`, compiled to `assets/ar-target-snuggest.mind` with
-MindAR 1.2.5) and the latest finished paintings and approved photos appear as framed
-pictures on the wall around it; tap one to view it. A-Frame and MindAR load from CDN
-only when AR is started. Without AR the same content shows as a scrolling gallery.
+**Phase 3:** AR wall gallery (`gallery.html`). Six numbered posters
+(`assets/posters/afterglow-poster-N.pdf`, A3). Every finished painting and approved
+photo gets a permanent place in time order: pictures 1–30 hang around poster N° 1,
+31–60 around N° 2, and so on. Pointing the phone at a poster shows its pictures as
+polaroids (with the note text) on the wall around it; tap to enlarge. Images load
+only for the poster in view. `assets/ar/ar-target-snuggest-N.mind` holds the first N
+posters (compiled with MindAR 1.2.5), so phones download only what's in use. The
+admin panel shows how full each poster is and when to print the next one. Beyond 180
+pictures, new posters (N° 7+) need to be designed and compiled.
 
-To use a different poster image, it must be recompiled into a new `.mind` file and
-the printed poster must match that exact image.
+Any printed poster must match its PDF exactly (no cropping or colour changes).
 
 ## Pages
 

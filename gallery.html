@@ -83,42 +83,64 @@ function applyLang() {
 }
 function toast(m) { const e = $("toast"); e.textContent = m; e.classList.add("show"); setTimeout(() => e.classList.remove("show"), 3500); }
 
-// ---- content: latest finished paintings + approved photos ----
-let items = [];
+// ---- content ----
+// Every finished painting and approved photo gets a permanent place in time order:
+// items 1–30 → poster N° 1, 31–60 → N° 2, … (posters available: MAX_POSTERS).
+const PER_POSTER = 30, MAX_POSTERS = 6;
+let items = []; // oldest → newest, metadata only; images load on demand
+
 async function loadItems() {
   const out = [];
   try {
     const rs = await getDocs(collection(db, "bars", barId, "rounds"));
-    const done = rs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status === "done").sort((a, b) => (b.n || 0) - (a.n || 0)).slice(0, 6);
-    for (const r of done) {
-      const im = await getDoc(doc(db, "bars", barId, "roundImages", r.id));
-      if (im.exists()) out.push({ kind: "painting", src: im.data().data, n: r.count || 0, words: (r.words || []).map((w) => w.w), ts: r.closedAt?.toMillis?.() || 0 });
-    }
+    rs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status === "done").forEach((r) =>
+      out.push({ kind: "painting", key: "r:" + r.id, ref: ["roundImages", r.id], n: r.count || 0, words: (r.words || []).map((w) => w.w), ts: r.closedAt?.toMillis?.() || r.n || 0 }));
   } catch (e) { console.warn(e); }
   try {
     const ns = await getDocs(query(collection(db, "bars", barId, "notes"), where("status", "==", "visible"), where("hasPhoto", "==", true)));
-    const notes = ns.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.toMillis() || 0) - (a.createdAt?.toMillis() || 0)).slice(0, 6);
-    for (const n of notes) {
-      const ph = await getDoc(doc(db, "bars", barId, "photos", n.id));
-      if (ph.exists()) out.push({ kind: "photo", src: ph.data().data, text: n.text || "", who: n.nick || "", table: n.table, ts: n.createdAt?.toMillis?.() || 0 });
-    }
+    ns.docs.map((d) => ({ id: d.id, ...d.data() })).forEach((n) =>
+      out.push({ kind: "photo", key: "p:" + n.id, ref: ["photos", n.id], text: n.text || "", who: n.nick || "", table: n.table, ts: n.createdAt?.toMillis?.() || 0 }));
   } catch (e) { console.warn(e); }
-  items = out.sort((a, b) => b.ts - a.ts);
+  items = out.sort((a, b) => a.ts - b.ts || a.key.localeCompare(b.key));
+  items.forEach((it, i) => { it.poster = Math.floor(i / PER_POSTER); });
+}
+
+const srcCache = new Map();
+function loadSrc(it) {
+  if (!srcCache.has(it.key)) {
+    srcCache.set(it.key, getDoc(doc(db, "bars", barId, ...it.ref)).then((s) => (s.exists() ? s.data().data : null)).catch(() => null));
+  }
+  return srcCache.get(it.key);
+}
+async function loadAll(list, n = 4) {
+  const q = [...list];
+  await Promise.all(Array.from({ length: n }, async () => { while (q.length) { const it = q.shift(); it.src = await loadSrc(it); } }));
 }
 
 const captionOf = (it) => it.kind === "painting"
   ? `${t("painted", { n: it.n })} · ${it.words.slice(0, 8).join(" · ")}${it.words.length > 8 ? "…" : ""}`
   : `${it.text}${it.who ? " — " + it.who : ""}`;
 
+// ---- browse view (newest first, images load as you scroll) ----
+let io = null;
 function renderGrid() {
   const g = $("grid"); g.innerHTML = "";
   if (!items.length) { const p = document.createElement("p"); p.className = "empty"; p.textContent = t("empty"); g.appendChild(p); return; }
-  for (const it of items) {
+  io?.disconnect();
+  io = new IntersectionObserver((es) => es.forEach(async (e) => {
+    if (!e.isIntersecting) return;
+    io.unobserve(e.target);
+    const it = e.target._it; it.src = it.src || await loadSrc(it);
+    if (it.src) e.target.querySelector("img").src = it.src;
+  }), { rootMargin: "600px" });
+  for (const it of [...items].reverse()) {
     const a = document.createElement("article"); a.className = "art";
-    a.innerHTML = `<img alt=""><div class="cap"></div>`;
-    a.querySelector("img").src = it.src;
+    a.innerHTML = `<img alt="" style="min-height:120px;background:#e9d6c3"><div class="cap"></div><div class="meta"></div>`;
     a.querySelector(".cap").textContent = captionOf(it);
-    a.onclick = () => openView(it);
+    a.querySelector(".meta").textContent = it.poster < MAX_POSTERS ? `Poster N° ${it.poster + 1}` : "";
+    a._it = it;
+    a.onclick = async () => { it.src = it.src || await loadSrc(it); if (it.src) openView(it); };
+    io.observe(a);
     g.appendChild(a);
   }
 }
@@ -127,119 +149,149 @@ function openView(it) { $("vimg").src = it.src; $("vcap").textContent = captionO
 // ignore the tail of the same tap that opened the view (pointerup → click)
 $("view").onclick = () => { if (Date.now() - openedAt > 450) $("view").classList.remove("on"); };
 
-// ---- AR (loaded only when asked) ----
+// ---- AR ----
 const addScript = (src) => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
 let arLoaded = false;
 
-// frame slots around the poster (poster: width 1, height ≈1.414, centred at 0,0) — kept close
-const SLOTS = [
-  [-0.92, 0.36], [0.92, 0.36], [-0.92, -0.38], [0.92, -0.38],
-  [-0.38, 1.02], [0.38, 1.02]
-];
+// 30 cells around the poster (poster: width 1, height ≈1.414, centred at 0,0), nearest first
+const CELL = 0.4;
+const SLOTS = (() => {
+  const c = [];
+  for (let r = -5; r <= 5; r++) for (let q = -4; q <= 4; q++) {
+    const x = q * CELL, y = r * CELL;
+    if (Math.abs(x) < 0.72 && Math.abs(y) < 0.92) continue; // poster area
+    c.push([x, y, Math.hypot(x * 0.9, y * 1.1)]);
+  }
+  return c.sort((a, b) => a[2] - b[2]).slice(0, PER_POSTER).map(([x, y]) => [x, y]);
+})();
 
-// Polaroid-style texture: picture + handwritten caption, drawn on a canvas.
-async function polaroid(it) {
-  await Promise.all([document.fonts.load('500 44px "Caveat"'), document.fonts.load('400 22px "Inter"')]).catch(() => {});
+// Polaroid texture: picture + handwritten caption
+async function polaroid(it, W = 420) {
+  await Promise.all([document.fonts.load('500 24px "Caveat"')]).catch(() => {});
   const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = it.src; });
-  const W = 800, pad = 28, iw = W - pad * 2;
+  const pad = Math.round(W * 0.04), iw = W - pad * 2, fs = Math.round(W * 0.06);
   const ih = it.kind === "painting" ? Math.round(iw * 9 / 16) : Math.round(iw * 0.8);
-  const cap = captionOf(it);
   const c = document.createElement("canvas"), x = c.getContext("2d");
-  // wrap caption to 2 lines
-  x.font = '500 44px "Caveat", cursive';
+  x.font = `500 ${fs}px "Caveat", cursive`;
   const lines = []; let line = "";
-  for (const word of cap.split(" ")) {
+  for (const word of captionOf(it).split(" ")) {
     const test = line ? line + " " + word : word;
-    if (x.measureText(test).width > iw && line) { lines.push(line); line = word; if (lines.length === 2) break; }
-    else line = test;
+    if (x.measureText(test).width > iw && line) { lines.push(line); line = word; if (lines.length === 2) break; } else line = test;
   }
   if (lines.length < 2 && line) lines.push(line);
-  if (lines.length === 2 && x.measureText(lines[1]).width > iw - 30) lines[1] = lines[1].slice(0, 40) + "…";
-  const capH = 30 + lines.length * 50 + 20;
-  c.width = W; c.height = pad + ih + capH;
+  c.width = W; c.height = pad + ih + Math.round(fs * 0.7) + lines.length * Math.round(fs * 1.15) + pad;
   x.fillStyle = "#fff3e0"; x.fillRect(0, 0, c.width, c.height);
   const sc = Math.max(iw / img.width, ih / img.height), sw = iw / sc, sh = ih / sc;
   x.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, pad, pad, iw, ih);
-  x.fillStyle = "#2a1a14"; x.font = '500 44px "Caveat", cursive';
-  lines.forEach((l, i) => x.fillText(l, pad, pad + ih + 60 + i * 50));
-  return { src: c.toDataURL("image/jpeg", 0.85), aspect: c.height / c.width };
+  x.fillStyle = "#2a1a14"; x.font = `500 ${fs}px "Caveat", cursive`;
+  lines.forEach((l, i) => x.fillText(l, pad, pad + ih + fs * 1.1 + i * fs * 1.15));
+  return { canvas: c, aspect: c.height / c.width };
 }
+
+const posterCount = () => Math.max(1, Math.min(MAX_POSTERS, Math.ceil(items.length / PER_POSTER)));
+let built = new Set(), activePoster = null, tapBound = false;
 
 async function startAR() {
   $("ar").classList.add("on"); $("arbar").classList.add("on");
-  renderStrip();
   try {
     if (!arLoaded) {
       await addScript("https://aframe.io/releases/1.5.0/aframe.min.js");
       await addScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js");
       arLoaded = true;
     }
-    await buildScene();
-  } catch (e) {
-    console.error(e); stopAR(); toast(t("arfail"));
+    buildScene();
+  } catch (e) { console.error(e); stopAR(); toast(t("arfail")); }
+}
+
+function buildScene() {
+  built = new Set(); activePoster = null;
+  const n = posterCount();
+  let targets = "";
+  for (let p = 0; p < n; p++) targets += `<a-entity mindar-image-target="targetIndex: ${p}" id="tg${p}"></a-entity>`;
+  $("ar").innerHTML = `
+    <a-scene mindar-image="imageTargetSrc: assets/ar/ar-target-${barId}-${n}.mind; maxTrack: 1; uiError: no; uiLoading: yes; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001; missTolerance: 25; warmupTolerance: 3"
+      color-space="sRGB" renderer="colorManagement: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+      ${targets}
+    </a-scene>`;
+  for (let p = 0; p < n; p++) {
+    const tg = $("tg" + p);
+    tg.addEventListener("targetFound", () => {
+      activePoster = p;
+      $("arhint").textContent = `Poster N° ${p + 1}`; $("arhint").style.opacity = 1;
+      renderStrip(p);
+      fillPoster(p);
+    });
+    tg.addEventListener("targetLost", () => { if (activePoster === p) { $("arhint").textContent = t("lost"); $("arhint").style.opacity = 1; } });
+  }
+  document.querySelector("#ar a-scene").addEventListener("arError", () => { stopAR(); toast(t("arfail")); });
+  bindTap();
+}
+
+async function fillPoster(p) {
+  if (built.has(p)) return;
+  built.add(p);
+  const list = items.filter((it) => it.poster === p);
+  await loadAll(list);
+  const tg = $("tg" + p);
+  if (!tg) return;
+  let i = 0;
+  for (const it of list) {
+    if (!it.src) continue;
+    const tex = await polaroid(it);
+    const slot = SLOTS[items.indexOf(it) % PER_POSTER];
+    const w = it.kind === "painting" ? 0.36 : 0.3, h = w * tex.aspect;
+    const ent = document.createElement("a-entity");
+    ent.setAttribute("position", `${slot[0]} ${slot[1]} 0`);
+    ent.setAttribute("rotation", `0 0 ${((i * 37) % 7) - 3}`);
+    ent.setAttribute("scale", "0.001 0.001 0.001");
+    ent.setAttribute("animation__in", `property: scale; to: 1 1 1; dur: 500; delay: ${60 * i}; easing: easeOutBack`);
+    const plane = document.createElement("a-plane");
+    plane.classList.add("clickable");
+    plane._it = it;
+    plane.setAttribute("width", w); plane.setAttribute("height", h);
+    plane.addEventListener("loaded", () => {
+      const THREE = AFRAME.THREE;
+      const tx = new THREE.CanvasTexture(tex.canvas);
+      tx.colorSpace = THREE.SRGBColorSpace;
+      plane.getObject3D("mesh").material = new THREE.MeshBasicMaterial({ map: tx });
+    });
+    ent.appendChild(plane);
+    tg.appendChild(ent);
+    i++;
   }
 }
 
-function renderStrip() {
+function renderStrip(p) {
   const st = $("strip"); st.innerHTML = "";
-  items.slice(0, 12).forEach((it) => { const i = document.createElement("img"); i.src = it.src; i.onclick = () => openView(it); st.appendChild(i); });
-  st.classList.toggle("on", items.length > 0);
+  const list = items.filter((it) => it.poster === p).reverse();
+  list.forEach((it) => {
+    const im = document.createElement("img");
+    im.style.minWidth = "48px"; im.style.background = "#e9d6c3";
+    loadSrc(it).then((s) => { if (s) { it.src = s; im.src = s; } });
+    im.onclick = () => it.src && openView(it);
+    st.appendChild(im);
+  });
+  st.classList.toggle("on", list.length > 0);
 }
 
-let shown = [], tapBound = false;
-async function buildScene() {
-  shown = items.slice(0, SLOTS.length);
-  const tex = await Promise.all(shown.map(polaroid));
-  let assets = "", frames = "";
-  shown.forEach((it, i) => {
-    assets += `<img id="ag${i}" src="${tex[i].src}">`;
-    const [x, y] = SLOTS[i];
-    const w = it.kind === "painting" ? 0.72 : 0.5;
-    const h = w * tex[i].aspect;
-    const rot = ((i * 37) % 7) - 3;
-    frames += `
-      <a-entity position="${x} ${y} 0" rotation="0 0 ${rot}" scale="0.001 0.001 0.001"
-        animation__in="property: scale; to: 1 1 1; dur: 600; delay: ${120 * i}; easing: easeOutBack; startEvents: show"
-        class="frame">
-        <a-plane class="clickable" data-i="${i}" width="${w}" height="${h}" material="src: #ag${i}; shader: flat"></a-plane>
-        <a-plane width="0.14" height="0.04" color="#ffc896" opacity="0.85" position="0 ${h / 2} 0.001" rotation="0 0 -4" shader="flat"></a-plane>
-      </a-entity>`;
-  });
-  $("ar").innerHTML = `
-    <a-scene mindar-image="imageTargetSrc: assets/ar-target-${barId}.mind; uiError: no; uiLoading: yes; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001; missTolerance: 25; warmupTolerance: 3"
-      color-space="sRGB" renderer="colorManagement: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
-      <a-assets>${assets}</a-assets>
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-      <a-entity mindar-image-target="targetIndex: 0" id="target">${frames}</a-entity>
-    </a-scene>`;
-  const target = $("target");
-  let shownOnce = false;
-  target.addEventListener("targetFound", () => {
-    if (!shownOnce) { document.querySelectorAll(".frame").forEach((f) => f.emit("show")); shownOnce = true; }
-    $("arhint").textContent = t("hint"); $("arhint").style.opacity = 0;
-  });
-  target.addEventListener("targetLost", () => { $("arhint").textContent = t("lost"); $("arhint").style.opacity = 1; });
-  const scene = document.querySelector("a-scene");
-  scene.addEventListener("arError", () => { stopAR(); toast(t("arfail")); });
-  // Tap → our own raycast (A-Frame's mouse cursor is unreliable over MindAR's camera view)
+// Tap → own raycast (A-Frame's mouse cursor doesn't fire reliably over MindAR's camera view)
+function bindTap() {
   if (tapBound) return;
   tapBound = true;
   window.addEventListener("pointerup", (e) => {
     if (!$("ar").classList.contains("on") || $("view").classList.contains("on")) return;
     if (e.target.closest?.(".strip, .arbar")) return;
-    const scene = document.querySelector("#ar a-scene"), target = $("target");
-    if (!scene || !target) return;
-    const THREE = window.AFRAME?.THREE, cam = scene.camera, canvas = scene.canvas;
-    if (!THREE || !cam || !canvas || !target.object3D.visible) return;
-    const r = canvas.getBoundingClientRect();
+    const scene = document.querySelector("#ar a-scene");
+    const THREE = window.AFRAME?.THREE;
+    if (!scene || !THREE || !scene.camera || activePoster === null) return;
+    const r = scene.canvas.getBoundingClientRect();
     const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    const ray = new THREE.Raycaster();
-    ray.setFromCamera(v, cam);
-    const meshes = [...document.querySelectorAll(".clickable")].map((p) => p.getObject3D("mesh")).filter(Boolean);
-    const hit = ray.intersectObjects(meshes, false)[0];
-    if (!hit) return;
-    const el = [...document.querySelectorAll(".clickable")].find((p) => p.getObject3D("mesh") === hit.object);
-    if (el) openView(shown[+el.dataset.i]);
+    const ray = new THREE.Raycaster(); ray.setFromCamera(v, scene.camera);
+    const planes = [...document.querySelectorAll(`#tg${activePoster} .clickable`)];
+    const hit = ray.intersectObjects(planes.map((p) => p.getObject3D("mesh")).filter(Boolean), false)[0];
+    const el = hit && planes.find((p) => p.getObject3D("mesh") === hit.object);
+    if (el?._it?.src) openView(el._it);
   });
 }
 

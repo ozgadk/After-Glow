@@ -168,6 +168,8 @@ function paintView() {
     </div>
     <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Words in this painting</h3>
     <div id="wlist"></div>
+    <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Wall gallery posters</h3>
+    <div id="wall" class="card"><p class="intro">Loading…</p></div>
     <h3 style="font-family:Fraunces,serif;font-weight:500;margin:22px 0 4px">Finished paintings</h3>
     <div id="plist"><p class="intro">Loading…</p></div>`;
   barUnsub?.();
@@ -210,11 +212,33 @@ function listenWords() {
   });
 }
 
+// 30 items per poster, in time order (same rule as gallery.html)
+function renderWall(doneRounds) {
+  const el = $("#wall"); if (!el) return;
+  const photos = notes.filter((n) => n.status === "visible" && n.hasPhoto).length;
+  const total = doneRounds + photos, PER = 30, MAX = 6;
+  const used = Math.max(1, Math.ceil(total / PER));
+  let html = `<div class="intro" style="margin:0 0 10px">${total} pictures on the wall (${doneRounds} paintings, ${photos} photos)</div>`;
+  for (let k = 1; k <= Math.min(MAX, used + 1); k++) {
+    const fill = Math.max(0, Math.min(PER, total - (k - 1) * PER));
+    const state = fill >= PER ? "full" : fill > 0 ? "filling" : "next";
+    const warn = state === "filling" && fill >= 25 ? ` <b style="color:#ffb36b">· print N° ${k + 1} soon</b>` : "";
+    html += `<div style="display:flex;align-items:center;gap:10px;margin:8px 0">
+      <b style="width:52px">N° ${k}</b>
+      <div style="flex:1;height:8px;border-radius:8px;background:rgba(255,255,255,0.1);overflow:hidden"><i style="display:block;height:100%;width:${(fill / PER) * 100}%;background:linear-gradient(90deg,#ffb36b,#ff6f8e)"></i></div>
+      <span style="width:120px;font-size:13px">${fill}/${PER} ${state === "next" ? "· next" : ""}${warn}</span>
+      <a class="btn" style="padding:5px 10px;font-size:12px" href="assets/posters/afterglow-poster-${k}.pdf" download>PDF</a></div>`;
+  }
+  if (total > MAX * PER) html += `<p class="intro" style="color:#ffb36b">More than ${MAX * PER} pictures — ask for posters N° 7+ (newer pictures show in the browse gallery meanwhile).</p>`;
+  el.innerHTML = html;
+}
+
 async function loadRounds() {
   const pl = $("#plist"); if (!pl) return;
   const snap = await getDocs(collection(db, "bars", barId, "rounds"));
   const items = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status)
     .sort((a, b) => (b.n || 0) - (a.n || 0));
+  renderWall(items.filter((r) => r.status === "done").length);
   pl.innerHTML = items.length ? "" : `<p class="intro">None yet.</p>`;
   for (const r of items) {
     const el = document.createElement("div"); el.className = "item";
