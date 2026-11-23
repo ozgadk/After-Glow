@@ -132,7 +132,9 @@ function render() {
 
   if (!table) {
     if (paintOnly) {
-      app.innerHTML = `<h1 class="table-name">✦</h1><section id="paint"></section>`;
+      app.innerHTML = `<h1 class="table-name">✦</h1><a class="gal-btn" id="galLink"></a><section id="paint"></section>`;
+      app.querySelector("#galLink").textContent = t("galleryBtn");
+      app.querySelector("#galLink").href = `gallery.html?bar=${encodeURIComponent(barId)}`;
       renderPaint();
       return;
     }
@@ -148,6 +150,7 @@ function render() {
   app.innerHTML = `
     <h1 class="table-name"></h1>
     <p class="intro"></p>
+    <a class="gal-btn" id="galLink"></a>
     <section id="paint"></section>
     <section class="notes" id="notes"></section>
     <section class="compose">
@@ -167,6 +170,9 @@ function render() {
 
   app.querySelector(".table-name").textContent = t("table", { n: table });
   app.querySelector(".intro").textContent = t("intro");
+  const gl = app.querySelector("#galLink");
+  gl.textContent = t("galleryBtn");
+  gl.href = `gallery.html?bar=${encodeURIComponent(barId)}`;
   app.querySelector(".compose h2").textContent = t("composeTitle");
 
   const ta = app.querySelector("#text");

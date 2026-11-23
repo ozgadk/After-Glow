@@ -2,6 +2,7 @@ export const LANGS = ["en", "lv", "ru", "tr"];
 
 export const STRINGS = {
   en: {
+    galleryBtn: "🖼 See the wall gallery",
     progress: "{n} of {target} words · {left} to go",
     revealSoon: "Your painting is being revealed on the screen ✦",
     keepTitle: "Your memory from tonight",
@@ -43,6 +44,7 @@ export const STRINGS = {
     loading: "Opening the table…"
   },
   lv: {
+    galleryBtn: "🖼 Apskatīt sienas galeriju",
     progress: "{n} no {target} vārdiem · vēl {left}",
     revealSoon: "Tava glezna tiek atklāta uz ekrāna ✦",
     keepTitle: "Tava atmiņa no šī vakara",
@@ -84,6 +86,7 @@ export const STRINGS = {
     loading: "Atveram galdu…"
   },
   ru: {
+    galleryBtn: "🖼 Открыть галерею на стене",
     progress: "{n} из {target} слов · осталось {left}",
     revealSoon: "Твоя картина появляется на экране ✦",
     keepTitle: "Твоё воспоминание об этом вечере",
@@ -125,6 +128,7 @@ export const STRINGS = {
     loading: "Открываем столик…"
   },
   tr: {
+    galleryBtn: "🖼 Duvar galerisine bak",
     progress: "{target} kelimeden {n} · {left} kaldı",
     revealSoon: "Tablon ekranda beliriyor ✦",
     keepTitle: "Bu geceden hatıran",

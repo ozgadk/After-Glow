@@ -28,7 +28,10 @@
     .arbar.on { display: flex; }
     .arbar .hint { color: #fff; font-family: "Caveat", cursive; font-size: 22px; text-shadow: 0 0 10px #000; }
     .arbar button { background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.3); border-radius: 999px; padding: 8px 14px; font-size: 14px; }
-    .view { position: fixed; inset: 0; z-index: 40; background: rgba(13,7,12,0.94); display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
+    .strip { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; display: none; gap: 10px; overflow-x: auto; padding: 12px 14px; padding-bottom: max(12px, env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,0.65)); }
+    .strip.on { display: flex; }
+    .strip img { height: 64px; border: 3px solid var(--paper); border-radius: 3px; flex: none; }
+    .view { position: fixed; inset: 0; z-index: 50; background: rgba(13,7,12,0.94); display: none; align-items: center; justify-content: center; flex-direction: column; padding: 20px; }
     .view.on { display: flex; }
     .view img { max-width: 100%; max-height: 70vh; border: 10px solid var(--paper); }
     .view p { font-family: "Caveat", cursive; font-size: 22px; color: #fff3e0; text-align: center; max-width: 520px; }
@@ -48,6 +51,7 @@
 
   <div id="ar"></div>
   <div class="arbar" id="arbar"><span class="hint" id="arhint"></span><button id="arclose">✕</button></div>
+  <div class="strip" id="strip"></div>
   <div class="view" id="view"><img id="vimg" alt=""><p id="vcap"></p></div>
   <div class="toast" id="toast"></div>
 
@@ -62,10 +66,10 @@ const barId = (new URLSearchParams(location.search).get("bar") || DEFAULT_BAR).t
 const $ = (id) => document.getElementById(id);
 
 const T = {
-  en: { h1: "The wall remembers.", hp: "Paintings made together by strangers and photos left at the tables.", ar: "📷 Point at the poster (AR)", browse: "Just browse the gallery", hint: "Point at the Afterglow poster", empty: "The wall is still empty. Leave a word or a photo tonight ✦", note: "The camera is only used on your phone to find the poster. Nothing is recorded or uploaded.", painted: "Painted together by {n} strangers", arfail: "AR couldn't start here. You can still browse the gallery." },
-  lv: { h1: "Siena atceras.", hp: "Svešinieku kopā radītas gleznas un pie galdiem atstāti foto.", ar: "📷 Pavērs kameru pret plakātu (AR)", browse: "Vienkārši apskatīt galeriju", hint: "Pavērs kameru pret Afterglow plakātu", empty: "Siena vēl ir tukša. Atstāj šovakar vārdu vai foto ✦", note: "Kamera tiek izmantota tikai tavā telefonā, lai atrastu plakātu. Nekas netiek ierakstīts vai augšupielādēts.", painted: "Kopā uzgleznojuši {n} svešinieki", arfail: "AR šeit neizdevās palaist. Galeriju vari apskatīt arī tāpat." },
-  ru: { h1: "Стена помнит.", hp: "Картины, нарисованные незнакомцами вместе, и фото, оставленные за столиками.", ar: "📷 Наведи камеру на постер (AR)", browse: "Просто посмотреть галерею", hint: "Наведи камеру на постер Afterglow", empty: "Стена пока пуста. Оставь сегодня слово или фото ✦", note: "Камера используется только на твоём телефоне, чтобы найти постер. Ничего не записывается и не загружается.", painted: "Нарисовано вместе: {n} незнакомцев", arfail: "AR здесь не запустился. Галерею можно посмотреть и так." },
-  tr: { h1: "Duvar hatırlıyor.", hp: "Yabancıların birlikte yaptığı tablolar ve masalara bırakılan fotoğraflar.", ar: "📷 Kamerayı postere tut (AR)", browse: "Sadece galeriye bak", hint: "Kamerayı Afterglow posterine tut", empty: "Duvar henüz boş. Bu gece bir kelime ya da fotoğraf bırak ✦", note: "Kamera sadece posteri bulmak için telefonunda kullanılır. Hiçbir şey kaydedilmez ya da yüklenmez.", painted: "{n} yabancı birlikte boyadı", arfail: "AR burada başlatılamadı. Galeriye yine de bakabilirsin." }
+  en: { lost: "Poster out of view — point back at it, or tap a picture below", h1: "The wall remembers.", hp: "Paintings made together by strangers and photos left at the tables.", ar: "📷 Point at the poster (AR)", browse: "Just browse the gallery", hint: "Point at the Afterglow poster", empty: "The wall is still empty. Leave a word or a photo tonight ✦", note: "The camera is only used on your phone to find the poster. Nothing is recorded or uploaded.", painted: "Painted together by {n} strangers", arfail: "AR couldn't start here. You can still browse the gallery." },
+  lv: { lost: "Plakāts nav redzams — pavērs kameru atpakaļ vai pieskaries attēlam zemāk", h1: "Siena atceras.", hp: "Svešinieku kopā radītas gleznas un pie galdiem atstāti foto.", ar: "📷 Pavērs kameru pret plakātu (AR)", browse: "Vienkārši apskatīt galeriju", hint: "Pavērs kameru pret Afterglow plakātu", empty: "Siena vēl ir tukša. Atstāj šovakar vārdu vai foto ✦", note: "Kamera tiek izmantota tikai tavā telefonā, lai atrastu plakātu. Nekas netiek ierakstīts vai augšupielādēts.", painted: "Kopā uzgleznojuši {n} svešinieki", arfail: "AR šeit neizdevās palaist. Galeriju vari apskatīt arī tāpat." },
+  ru: { lost: "Постер вне кадра — наведи камеру снова или нажми на картинку внизу", h1: "Стена помнит.", hp: "Картины, нарисованные незнакомцами вместе, и фото, оставленные за столиками.", ar: "📷 Наведи камеру на постер (AR)", browse: "Просто посмотреть галерею", hint: "Наведи камеру на постер Afterglow", empty: "Стена пока пуста. Оставь сегодня слово или фото ✦", note: "Камера используется только на твоём телефоне, чтобы найти постер. Ничего не записывается и не загружается.", painted: "Нарисовано вместе: {n} незнакомцев", arfail: "AR здесь не запустился. Галерею можно посмотреть и так." },
+  tr: { lost: "Poster kadrajda değil — kamerayı tekrar posteri tut ya da aşağıdan bir resme dokun", h1: "Duvar hatırlıyor.", hp: "Yabancıların birlikte yaptığı tablolar ve masalara bırakılan fotoğraflar.", ar: "📷 Kamerayı postere tut (AR)", browse: "Sadece galeriye bak", hint: "Kamerayı Afterglow posterine tut", empty: "Duvar henüz boş. Bu gece bir kelime ya da fotoğraf bırak ✦", note: "Kamera sadece posteri bulmak için telefonunda kullanılır. Hiçbir şey kaydedilmez ya da yüklenmez.", painted: "{n} yabancı birlikte boyadı", arfail: "AR burada başlatılamadı. Galeriye yine de bakabilirsin." }
 };
 let lang = pickLang();
 const t = (k, v = {}) => (T[lang][k] || T.en[k]).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? "");
@@ -125,66 +129,122 @@ $("view").onclick = () => $("view").classList.remove("on");
 const addScript = (src) => new Promise((ok, no) => { const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
 let arLoaded = false;
 
-// frame slots around the poster (poster: width 1, height ≈1.414, centred at 0,0)
+// frame slots around the poster (poster: width 1, height ≈1.414, centred at 0,0) — kept close
 const SLOTS = [
-  [-1.05, 0.45], [1.05, 0.45], [-1.05, -0.35], [1.05, -0.35],
-  [-0.45, 1.15], [0.45, 1.15], [-1.05, -1.1], [1.05, -1.1]
+  [-0.92, 0.36], [0.92, 0.36], [-0.92, -0.38], [0.92, -0.38],
+  [-0.38, 1.02], [0.38, 1.02]
 ];
+
+// Polaroid-style texture: picture + handwritten caption, drawn on a canvas.
+async function polaroid(it) {
+  await Promise.all([document.fonts.load('500 44px "Caveat"'), document.fonts.load('400 22px "Inter"')]).catch(() => {});
+  const img = await new Promise((ok, no) => { const i = new Image(); i.onload = () => ok(i); i.onerror = no; i.src = it.src; });
+  const W = 800, pad = 28, iw = W - pad * 2;
+  const ih = it.kind === "painting" ? Math.round(iw * 9 / 16) : Math.round(iw * 0.8);
+  const cap = captionOf(it);
+  const c = document.createElement("canvas"), x = c.getContext("2d");
+  // wrap caption to 2 lines
+  x.font = '500 44px "Caveat", cursive';
+  const lines = []; let line = "";
+  for (const word of cap.split(" ")) {
+    const test = line ? line + " " + word : word;
+    if (x.measureText(test).width > iw && line) { lines.push(line); line = word; if (lines.length === 2) break; }
+    else line = test;
+  }
+  if (lines.length < 2 && line) lines.push(line);
+  if (lines.length === 2 && x.measureText(lines[1]).width > iw - 30) lines[1] = lines[1].slice(0, 40) + "…";
+  const capH = 30 + lines.length * 50 + 20;
+  c.width = W; c.height = pad + ih + capH;
+  x.fillStyle = "#fff3e0"; x.fillRect(0, 0, c.width, c.height);
+  const sc = Math.max(iw / img.width, ih / img.height), sw = iw / sc, sh = ih / sc;
+  x.drawImage(img, (img.width - sw) / 2, (img.height - sh) / 2, sw, sh, pad, pad, iw, ih);
+  x.fillStyle = "#2a1a14"; x.font = '500 44px "Caveat", cursive';
+  lines.forEach((l, i) => x.fillText(l, pad, pad + ih + 60 + i * 50));
+  return { src: c.toDataURL("image/jpeg", 0.85), aspect: c.height / c.width };
+}
 
 async function startAR() {
   $("ar").classList.add("on"); $("arbar").classList.add("on");
+  renderStrip();
   try {
     if (!arLoaded) {
       await addScript("https://aframe.io/releases/1.5.0/aframe.min.js");
       await addScript("https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js");
       arLoaded = true;
     }
-    buildScene();
+    await buildScene();
   } catch (e) {
     console.error(e); stopAR(); toast(t("arfail"));
   }
 }
 
-function buildScene() {
-  const shown = items.slice(0, SLOTS.length);
+function renderStrip() {
+  const st = $("strip"); st.innerHTML = "";
+  items.slice(0, 12).forEach((it) => { const i = document.createElement("img"); i.src = it.src; i.onclick = () => openView(it); st.appendChild(i); });
+  st.classList.toggle("on", items.length > 0);
+}
+
+let shown = [], tapBound = false;
+async function buildScene() {
+  shown = items.slice(0, SLOTS.length);
+  const tex = await Promise.all(shown.map(polaroid));
   let assets = "", frames = "";
   shown.forEach((it, i) => {
-    assets += `<img id="ag${i}" src="${it.src}" crossorigin="anonymous">`;
+    assets += `<img id="ag${i}" src="${tex[i].src}">`;
     const [x, y] = SLOTS[i];
-    const w = it.kind === "painting" ? 0.9 : 0.62;
-    const h = it.kind === "painting" ? w * 9 / 16 : w * 0.75;
+    const w = it.kind === "painting" ? 0.72 : 0.5;
+    const h = w * tex[i].aspect;
     const rot = ((i * 37) % 7) - 3;
     frames += `
       <a-entity position="${x} ${y} 0" rotation="0 0 ${rot}" scale="0.001 0.001 0.001"
-        animation__in="property: scale; to: 1 1 1; dur: 700; delay: ${150 * i}; easing: easeOutBack; startEvents: show"
-        animation__out="property: scale; to: 0.001 0.001 0.001; dur: 200; startEvents: hide"
+        animation__in="property: scale; to: 1 1 1; dur: 600; delay: ${120 * i}; easing: easeOutBack; startEvents: show"
         class="frame">
-        <a-plane width="${w + 0.06}" height="${h + 0.06}" color="#fff3e0" position="0 0 -0.002" shader="flat"></a-plane>
         <a-plane class="clickable" data-i="${i}" width="${w}" height="${h}" material="src: #ag${i}; shader: flat"></a-plane>
-        <a-plane width="0.16" height="0.045" color="#ffc896" opacity="0.85" position="0 ${h / 2 + 0.03} 0.001" rotation="0 0 -4" shader="flat"></a-plane>
+        <a-plane width="0.14" height="0.04" color="#ffc896" opacity="0.85" position="0 ${h / 2} 0.001" rotation="0 0 -4" shader="flat"></a-plane>
       </a-entity>`;
   });
   $("ar").innerHTML = `
-    <a-scene mindar-image="imageTargetSrc: assets/ar-target-${barId}.mind; uiError: no; uiLoading: yes; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001"
-      color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false"
-      cursor="rayOrigin: mouse; fuse: false" raycaster="objects: .clickable">
+    <a-scene mindar-image="imageTargetSrc: assets/ar-target-${barId}.mind; uiError: no; uiLoading: yes; uiScanning: yes; filterMinCF: 0.0001; filterBeta: 0.001; missTolerance: 25; warmupTolerance: 3"
+      color-space="sRGB" renderer="colorManagement: true" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
       <a-assets>${assets}</a-assets>
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
       <a-entity mindar-image-target="targetIndex: 0" id="target">${frames}</a-entity>
     </a-scene>`;
   const target = $("target");
-  const frameEls = () => [...document.querySelectorAll(".frame")];
-  target.addEventListener("targetFound", () => { frameEls().forEach((f) => f.emit("show")); $("arhint").style.opacity = 0; });
-  target.addEventListener("targetLost", () => { frameEls().forEach((f) => f.emit("hide")); $("arhint").style.opacity = 1; });
-  document.querySelectorAll(".clickable").forEach((p) => p.addEventListener("click", () => openView(shown[+p.dataset.i])));
+  let shownOnce = false;
+  target.addEventListener("targetFound", () => {
+    if (!shownOnce) { document.querySelectorAll(".frame").forEach((f) => f.emit("show")); shownOnce = true; }
+    $("arhint").textContent = t("hint"); $("arhint").style.opacity = 0;
+  });
+  target.addEventListener("targetLost", () => { $("arhint").textContent = t("lost"); $("arhint").style.opacity = 1; });
   const scene = document.querySelector("a-scene");
   scene.addEventListener("arError", () => { stopAR(); toast(t("arfail")); });
+  // Tap → our own raycast (A-Frame's mouse cursor is unreliable over MindAR's camera view)
+  if (tapBound) return;
+  tapBound = true;
+  window.addEventListener("pointerup", (e) => {
+    if (!$("ar").classList.contains("on") || $("view").classList.contains("on")) return;
+    if (e.target.closest?.(".strip, .arbar")) return;
+    const scene = document.querySelector("#ar a-scene"), target = $("target");
+    if (!scene || !target) return;
+    const THREE = window.AFRAME?.THREE, cam = scene.camera, canvas = scene.canvas;
+    if (!THREE || !cam || !canvas || !target.object3D.visible) return;
+    const r = canvas.getBoundingClientRect();
+    const v = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(v, cam);
+    const meshes = [...document.querySelectorAll(".clickable")].map((p) => p.getObject3D("mesh")).filter(Boolean);
+    const hit = ray.intersectObjects(meshes, false)[0];
+    if (!hit) return;
+    const el = [...document.querySelectorAll(".clickable")].find((p) => p.getObject3D("mesh") === hit.object);
+    if (el) openView(shown[+el.dataset.i]);
+  });
 }
 
 function stopAR() {
   const scene = document.querySelector("#ar a-scene");
   try { scene?.systems["mindar-image-system"]?.stop(); } catch {}
-  $("ar").innerHTML = ""; $("ar").classList.remove("on"); $("arbar").classList.remove("on");
+  $("ar").innerHTML = ""; $("ar").classList.remove("on"); $("arbar").classList.remove("on"); $("strip").classList.remove("on");
   document.querySelectorAll("video").forEach((v) => { v.srcObject?.getTracks?.().forEach((tr) => tr.stop()); v.remove(); });
 }
 

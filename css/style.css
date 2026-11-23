@@ -190,3 +190,9 @@ header { display: flex; align-items: center; justify-content: space-between; gap
 .keep .kbtn { width: 100%; }
 .keep .kwait { font-family: "Caveat", cursive; font-size: 22px; margin: 0; text-align: center; animation: pulse2 2s ease-in-out infinite; }
 @keyframes pulse2 { 50% { opacity: 0.5; } }
+.gal-btn {
+  display: block; text-align: center; text-decoration: none; margin: -8px 0 24px;
+  padding: 14px; border-radius: 999px; font-weight: 600; font-size: 16px;
+  color: #f6e9e2; border: 1px solid rgba(255,179,107,0.5);
+  background: rgba(255,179,107,0.10); box-shadow: 0 0 30px rgba(255,140,90,0.15);
+}
