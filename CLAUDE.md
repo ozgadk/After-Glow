@@ -31,13 +31,14 @@ reply to him in Turkish, keep it short and practical, and be honest about what w
 ## Data (Firestore)
 ```
 admins/{uid}                                  created by hand
-bars/{bar}                                    { name, requireApproval, currentRound, roundTarget(20–30) }
+bars/{bar}                                    { name, instagram, hashtag, requireApproval, currentRound, roundTarget(20–30) }
 bars/{bar}/notes/{id}                         { table, text, nick?, mood?, status visible|pending|hidden, reportCount, hasPhoto?, createdAt, uid }
 bars/{bar}/notes/{id}/reports/{uid}
 bars/{bar}/photos/{noteId}                    { data: JPEG data URL ≤900 KB }   (photos always start pending)
 bars/{bar}/rounds/r{n}/strokes/{id}           { word ≤20, color joy|love|dream|calm|wild|gold, table?, createdAt, uid }
 bars/{bar}/rounds/r{n}                        { status generating|done, n, words[], count, prompt, seed, source ai|abstract }
 bars/{bar}/roundImages/r{n}                   { data: JPEG data URL }
+bars/{bar}/banned/{uid}                       blocked devices (admin only); rules refuse their notes/photos/words/reports
 rateLimits/{uid} (notes, 30 s) · strokeLimits/{uid} (words, 8 s)
 ```
 Images live in Firestore as data URLs because Storage needs the paid Blaze plan.

@@ -60,6 +60,7 @@ let mood = "";
 let photo = null; // { dataUrl, canvas }
 let paintMood = "joy";
 let curRound = 1, roundTarget = DEFAULT_TARGET, roundCount = 0, barName = "The Snuggest";
+let barTag = { instagram: "@thesnuggest", hashtag: "#AfterglowRiga" };
 const MINE_KEY = "ag_mine";
 const loadMine = () => { try { return JSON.parse(localStorage.getItem(MINE_KEY) || "[]"); } catch { return []; } };
 const saveMine = (m) => { try { localStorage.setItem(MINE_KEY, JSON.stringify(m.slice(-20))); } catch {} };
@@ -329,6 +330,8 @@ function watchBar() {
     curRound = d.currentRound || 1;
     roundTarget = Math.min(30, Math.max(20, d.roundTarget || DEFAULT_TARGET));
     if (d.name) barName = d.name;
+    if (d.instagram !== undefined) barTag.instagram = d.instagram;
+    if (d.hashtag !== undefined) barTag.hashtag = d.hashtag;
     if (countRound !== curRound) {
       countRound = curRound;
       countUnsub?.();
@@ -400,11 +403,12 @@ function renderKeepsakes() {
         const blob = await makePostcard({
           image: k.image, words: k.round.words || [], mine: myWords, n: r,
           count: k.round.count || (k.round.words || []).length, barName, date,
-          line: t("postcardLine", { n: others })
+          line: t("postcardLine", { n: others }),
+          tag: [barTag.instagram, barTag.hashtag].filter(Boolean).join("  ·  ")
         });
         const file = new File([blob], `afterglow-${barId}-${r}.jpg`, { type: "image/jpeg" });
         if (navigator.canShare?.({ files: [file] })) {
-          await navigator.share({ files: [file], title: "Afterglow" }).catch(() => {});
+          await navigator.share({ files: [file], title: "Afterglow", text: [barTag.instagram, barTag.hashtag].filter(Boolean).join(" ") }).catch(() => {});
         } else {
           const a = document.createElement("a");
           a.href = URL.createObjectURL(blob); a.download = file.name; a.click();

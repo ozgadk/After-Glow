@@ -17,6 +17,10 @@ service cloud.firestore {
       return exists(p) && get(p).data.get('requireApproval', false) == true;
     }
 
+    function notBanned(barId) {
+      return !exists(/databases/$(database)/documents/bars/$(barId)/banned/$(request.auth.uid));
+    }
+
     function isCurrentRound(barId, round) {
       let p = /databases/$(database)/documents/bars/$(barId);
       return (!exists(p) && round == 'r1')
@@ -66,8 +70,8 @@ service cloud.firestore {
 
       match /notes/{noteId} {
         allow read: if resource.data.status == 'visible' || isAdmin();
-        allow create: if signedIn() && validNewNote(barId);
-        allow update: if isAdmin() || validReport(barId, noteId);
+        allow create: if signedIn() && notBanned(barId) && validNewNote(barId);
+        allow update: if isAdmin() || (notBanned(barId) && validReport(barId, noteId));
         allow delete: if isAdmin();
 
         match /reports/{uid} {
@@ -81,7 +85,7 @@ service cloud.firestore {
       // Living Painting: words go into the bar's *current* round only
       match /rounds/{round}/strokes/{strokeId} {
         allow read: if true;
-        allow create: if signedIn()
+        allow create: if signedIn() && notBanned(barId)
           && isCurrentRound(barId, round)
           && request.resource.data.keys().hasOnly(['word', 'color', 'table', 'createdAt', 'uid'])
           && request.resource.data.keys().hasAll(['word', 'color', 'createdAt', 'uid'])
@@ -110,6 +114,11 @@ service cloud.firestore {
         allow delete: if isAdmin();
       }
 
+      // Blocked devices (anonymous uids) — admin only
+      match /banned/{uid} {
+        allow read, write: if isAdmin();
+      }
+
       // Saved nightly paintings (JPEG data URL), written by an admin's screen or panel
       match /paintings/{night} {
         allow read: if true;
@@ -123,7 +132,7 @@ service cloud.firestore {
       match /photos/{noteId} {
         allow read: if isAdmin()
           || get(/databases/$(database)/documents/bars/$(barId)/notes/$(noteId)).data.status == 'visible';
-        allow create: if signedIn()
+        allow create: if signedIn() && notBanned(barId)
           && request.resource.data.keys().hasOnly(['data', 'createdAt', 'uid'])
           && request.resource.data.data is string
           && request.resource.data.data.size() <= 900000

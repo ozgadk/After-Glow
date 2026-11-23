@@ -72,7 +72,10 @@ function adminView() {
     <div class="card">
       <div>Bar: <b>${esc(barId)}</b></div>
       <label style="margin-top:10px"><input type="checkbox" id="appr"> Approve every note before it appears</label>
-      <label style="margin-top:10px">Display name <input type="text" id="bname" placeholder="The Snuggest"> <button class="btn" id="bsave">Save</button></label>
+      <label style="margin-top:10px">Display name <input type="text" id="bname" placeholder="The Snuggest"></label>
+      <label style="margin-top:10px">Instagram <input type="text" id="binsta" placeholder="@thesnuggest" style="width:140px"></label>
+      <label style="margin-top:10px">Hashtag <input type="text" id="btag" placeholder="#AfterglowRiga" style="width:140px"> <button class="btn" id="bsave">Save</button></label>
+      <p class="intro" style="margin:6px 0 0;font-size:12px">Instagram + hashtag are printed on guests' postcards.</p>
     </div>
     <div class="tabs"><button class="btn on" id="secNotes">📝 Notes</button><button class="btn" id="secPaint">🎨 Painting</button></div>
     <div id="notesSec">
@@ -88,11 +91,21 @@ function adminView() {
     bar = s.exists() ? s.data() : {};
     $("#appr").checked = bar.requireApproval === true;
     $("#bname").value = bar.name || "";
+    $("#binsta").value = bar.instagram ?? "@thesnuggest";
+    $("#btag").value = bar.hashtag ?? "#AfterglowRiga";
   });
   $("#appr").onchange = (e) => setDoc(doc(db, "bars", barId), { requireApproval: e.target.checked }, { merge: true })
     .then(() => toast(e.target.checked ? "Approval mode ON" : "Approval mode OFF"));
-  $("#bsave").onclick = () => setDoc(doc(db, "bars", barId), { name: $("#bname").value.trim() }, { merge: true }).then(() => toast("Saved"));
+  $("#bsave").onclick = () => {
+    const ig = $("#binsta").value.trim(), ht = $("#btag").value.trim();
+    setDoc(doc(db, "bars", barId), {
+      name: $("#bname").value.trim(),
+      instagram: ig && !ig.startsWith("@") ? "@" + ig : ig,
+      hashtag: ht && !ht.startsWith("#") ? "#" + ht : ht
+    }, { merge: true }).then(() => toast("Saved"));
+  };
 
+  listenBanned();
   unsub?.();
   unsub = onSnapshot(collection(db, "bars", barId, "notes"), (snap) => {
     notes = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
@@ -108,6 +121,7 @@ function renderList() {
     ["hidden", "Hidden", (n) => n.status === "hidden"],
     ["all", "All", () => true]
   ];
+  const showBlocked = filter === "blocked";
   $("#tabs").innerHTML = "";
   for (const [k, label, fn] of tabs) {
     const b = document.createElement("button");
@@ -118,6 +132,13 @@ function renderList() {
   }
   const tables = new Set(notes.filter((n) => n.status === "visible").map((n) => n.table));
   $("#stats").textContent = `${notes.length} notes total · ${tables.size} tables with visible notes`;
+
+  const bb = document.createElement("button");
+  bb.className = "btn" + (showBlocked ? " on" : "");
+  bb.textContent = `⛔ Blocked (${banned.size})`;
+  bb.onclick = () => { filter = "blocked"; renderList(); };
+  $("#tabs").appendChild(bb);
+  if (showBlocked) return renderBlocked();
 
   const fn = tabs.find((x) => x[0] === filter)[2];
   const list = notes.filter(fn);
@@ -144,6 +165,7 @@ function renderList() {
     if (n.status !== "visible") add("✓ Show", "", () => updateDoc(ref, { status: "visible", reportCount: 0 }));
     if (n.status === "visible" && n.reportCount) add("✓ Keep (clear reports)", "", () => updateDoc(ref, { reportCount: 0 }));
     if (n.status !== "hidden") add("Hide", "", () => updateDoc(ref, { status: "hidden" }));
+    if (n.uid && !banned.has(n.uid)) add("⛔ Block device", "danger", () => blockDevice(n.uid, n.text || "(photo)"));
     add("Delete", "danger", async () => {
       if (!confirm("Delete this note forever?")) return;
       if (n.hasPhoto) await deleteDoc(doc(db, "bars", barId, "photos", n.id)).catch(() => {});
@@ -205,8 +227,10 @@ function listenWords() {
       const el = document.createElement("div"); el.className = "item";
       el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span>${esc(MOODS[w.color]?.emoji || "")} <b>${esc(w.word)}</b> <span style="color:#7a5e52;font-size:12px">${w.table ? "table " + esc(w.table) + " · " : ""}${w.createdAt ? esc(w.createdAt.toDate().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })) : ""}</span></span>
-        <button class="btn danger" style="color:#c0392b;border-color:#e5a39b;padding:5px 10px;font-size:12px">Remove</button></div>`;
+        <span style="display:flex;gap:6px"><button class="btn danger" style="color:#c0392b;border-color:#e5a39b;padding:5px 10px;font-size:12px">Remove</button>
+        ${w.uid && !banned.has(w.uid) ? `<button class="btn danger blk" style="color:#c0392b;border-color:#e5a39b;padding:5px 10px;font-size:12px">⛔ Block</button>` : ""}</span></div>`;
       el.querySelector("button").onclick = () => deleteDoc(doc(db, "bars", barId, "rounds", roundKey(cur), "strokes", w.id));
+      el.querySelector(".blk")?.addEventListener("click", () => blockDevice(w.uid, w.word));
       wl.appendChild(el);
     }
   });
@@ -266,6 +290,42 @@ async function loadRounds() {
     pl.appendChild(el);
   }
 }
+
+// ---- blocked devices ----
+const banned = new Map(); // uid -> data
+let bannedUnsub = null;
+function listenBanned() {
+  bannedUnsub?.();
+  bannedUnsub = onSnapshot(collection(db, "bars", barId, "banned"), (snap) => {
+    banned.clear();
+    snap.docs.forEach((d) => banned.set(d.id, d.data()));
+    if ($("#list")) renderList();
+  });
+}
+async function blockDevice(uid, sample) {
+  const mine = notes.filter((n) => n.uid === uid && n.status !== "hidden");
+  const words = (typeof tonightWords === "function" ? tonightWords() : []).filter((w) => w.uid === uid);
+  if (!confirm(`Block this device?\n\nIt can no longer post notes, photos, words or reports.\nAlso hides its ${mine.length} note(s) and removes its ${words.length} word(s) from the current painting.`)) return;
+  await setDoc(doc(db, "bars", barId, "banned", uid), { at: serverTimestamp(), sample: String(sample || "").slice(0, 80) });
+  await Promise.all([
+    ...mine.map((n) => updateDoc(doc(db, "bars", barId, "notes", n.id), { status: "hidden" })),
+    ...words.map((w) => deleteDoc(doc(db, "bars", barId, "rounds", roundKey(cur), "strokes", w.id)))
+  ]).catch((e) => toast(e.message));
+  toast("Device blocked");
+}
+function renderBlocked() {
+  const list = [...banned.entries()];
+  $("#list").innerHTML = list.length ? "" : `<p class="intro">No blocked devices.</p>`;
+  for (const [uid, b] of list) {
+    const el = document.createElement("div"); el.className = "item";
+    el.innerHTML = `<div><b>Device</b> <code style="color:#7a5e52;background:#efe2d4">${esc(uid.slice(0, 8))}…</code></div>
+      <div class="meta">${b.at ? esc(b.at.toDate().toLocaleString()) : ""}${b.sample ? " · “" + esc(b.sample) + "”" : ""}</div>
+      <div class="actions"><button class="btn">Unblock</button></div>`;
+    el.querySelector("button").onclick = () => { if (confirm("Unblock this device?")) deleteDoc(doc(db, "bars", barId, "banned", uid)); };
+    $("#list").appendChild(el);
+  }
+}
+const tonightWords = () => words;
 
 const photoCache = new Map();
 function loadPhoto(id) {

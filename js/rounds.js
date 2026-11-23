@@ -116,7 +116,7 @@ export async function regenerate(db, fs, barId, n, strokes, prompt) {
 }
 
 // ---- keepsake postcard (1080×1920, story format) ----
-export async function makePostcard({ image, words, mine, n, count, barName, date, line }) {
+export async function makePostcard({ image, words, mine, n, count, barName, date, line, tag = "" }) {
   await Promise.all([
     document.fonts.load('600 64px "Fraunces"'),
     document.fonts.load('500 48px "Caveat"'),
@@ -159,7 +159,7 @@ export async function makePostcard({ image, words, mine, n, count, barName, date
   x.restore();
 
   // text block: sized to the number of words, centred in the space left
-  const areaTop = top + ph + 60, areaBottom = 1820;
+  const areaTop = top + ph + 60, areaBottom = 1800;
   const n0 = words.length;
   const base = n0 <= 6 ? 64 : n0 <= 12 ? 54 : n0 <= 20 ? 46 : 40;
   const layout = [];
@@ -195,8 +195,15 @@ export async function makePostcard({ image, words, mine, n, count, barName, date
     if (L.isMine) x.fillRect(80 + L.x, yy + 12, L.tw, 5);
     x.globalAlpha = 1;
   }
-  x.fillStyle = "#6f5d57"; x.font = '400 22px "Inter", sans-serif';
-  x.fillText("ozgadk.github.io/After-Glow", 80, 1880);
+  if (tag) {
+    const tg = x.createLinearGradient(80, 0, 900, 0);
+    tg.addColorStop(0, "#ffb36b"); tg.addColorStop(1, "#ff6f8e");
+    x.fillStyle = tg; x.font = '600 34px "Inter", sans-serif';
+    x.fillText(tag, 80, 1878);
+  } else {
+    x.fillStyle = "#6f5d57"; x.font = '400 22px "Inter", sans-serif';
+    x.fillText("ozgadk.github.io/After-Glow", 80, 1880);
+  }
   return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.9));
 }
 
