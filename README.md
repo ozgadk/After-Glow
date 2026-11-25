@@ -67,7 +67,7 @@ reports are hidden from guests until an admin reviews them.
 ## One-time Firebase setup
 
 1. **Authentication → Sign-in method:** enable **Anonymous** and **Google**.
-2. **Authentication → Settings → Authorized domains:** add `ozgadk.github.io`.
+2. **Authentication → Settings → Authorized domains:** add `afterglow.thesnuggest.com` (and `ozgadk.github.io`).
 3. **Firestore → Rules:** paste `firestore.rules`, Publish.
 4. Open `admin.html`, sign in with Google, copy the UID shown, then in
    **Firestore → Data** create collection `admins` → document with that UID as

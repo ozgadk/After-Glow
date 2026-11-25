@@ -5,7 +5,8 @@ meant to be sold to other venues later. Owner: Özgür (ozgadk). He writes in Tu
 reply to him in Turkish, keep it short and practical, and be honest about what wasn't tested.
 
 ## Stack
-- Static site on **GitHub Pages**: https://ozgadk.github.io/After-Glow/ (branch `main`, root).
+- Static site on **GitHub Pages**: https://afterglow.thesnuggest.com/ (custom domain via `CNAME`;
+  old https://ozgadk.github.io/After-Glow/ links redirect there). Branch `main`, root. All paths are relative.
 - **Firebase** project `after-glow-42465` (free Spark plan): Firestore + Auth
   (Anonymous for guests, Google for admins). Config in `js/firebase-config.js` (public by design).
 - Firebase JS SDK 10.12.2 from gstatic (ES modules, no build step, no npm in the app).

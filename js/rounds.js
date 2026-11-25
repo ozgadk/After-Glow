@@ -202,7 +202,7 @@ export async function makePostcard({ image, words, mine, n, count, barName, date
     x.fillText(tag, 80, 1878);
   } else {
     x.fillStyle = "#6f5d57"; x.font = '400 22px "Inter", sans-serif';
-    x.fillText("ozgadk.github.io/After-Glow", 80, 1880);
+    x.fillText("afterglow.thesnuggest.com", 80, 1880);
   }
   return new Promise((ok) => c.toBlob(ok, "image/jpeg", 0.9));
 }
