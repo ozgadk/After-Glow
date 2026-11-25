@@ -1,0 +1,5 @@
+# Firebase Auth "Authorized domains" (needed for Google sign-in on admin/screen).
+# One per line. Synced by .github/workflows/auth-domains.yml on push to main.
+# Domains are only added, never removed (remove by hand in the console).
+afterglow.thesnuggest.com
+ozgadk.github.io

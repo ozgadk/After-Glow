@@ -1,0 +1,24 @@
+name: Sync Firebase Auth domains
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/auth-domains.txt, .github/workflows/auth-domains.yml, .github/scripts/auth-domains.mjs]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write service account
+        env:
+          SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+      - name: Add authorized domains
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/sa.json
+          FIREBASE_PROJECT: after-glow-42465
+        run: |
+          npm install --no-save --silent google-auth-library@9
+          node .github/scripts/auth-domains.mjs

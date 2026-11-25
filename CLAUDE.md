@@ -49,6 +49,8 @@ Images live in Firestore as data URLs because Storage needs the paid Blaze plan.
 on push to `main` (uses repo secret `FIREBASE_SERVICE_ACCOUNT`, Firebase Rules REST API via
 `.github/scripts/deploy-rules.mjs`). Rule errors show up as annotations on the Actions run.
 Never ask the user to paste rules by hand.
+Firebase Auth authorized domains: listed in `.github/auth-domains.txt`, added by
+`.github/workflows/auth-domains.yml` (same service account, Identity Toolkit Admin API).
 
 ## AR wall gallery
 - Six numbered posters: `assets/posters/afterglow-poster-N.pdf` (A3). Printed posters must
