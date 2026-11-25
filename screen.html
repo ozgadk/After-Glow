@@ -15,11 +15,11 @@
     .stage { overflow: hidden; }
     canvas { width: 100%; height: 100%; display: block; }
     /* slow "breathing" camera over the painting so it never looks frozen */
-    .paint { position: absolute; inset: 0; transform-origin: 50% 50%; animation: drift 80s ease-in-out infinite alternate; will-change: transform; }
+    .paint { position: absolute; inset: 0; transform-origin: 50% 50%; animation: drift 40s ease-in-out infinite alternate; will-change: transform; }
     @keyframes drift {
-      0%   { transform: scale(1.02) translate(0, 0); }
-      50%  { transform: scale(1.08) translate(-1.6%, 0.8%); }
-      100% { transform: scale(1.05) translate(1.4%, -1%); }
+      0%   { transform: scale(1.03) translate(0, 0); }
+      50%  { transform: scale(1.12) translate(-2.5%, 1.2%); }
+      100% { transform: scale(1.07) translate(2.2%, -1.5%); }
     }
     #amb { position: absolute; inset: 0; mix-blend-mode: screen; }
     .words { position: absolute; inset: 0; pointer-events: none; }
@@ -125,9 +125,9 @@
   <div class="start" id="start"><b>Tap to start the painting</b><span>Goes fullscreen and keeps the screen awake</span></div>
 
 <script type="module">
-import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
-import { W, H, MOODS, renderAll, computeParticles, drawBloom, drawParticle, strokeLayout, flowAngle } from "./js/painting.js";
-import { DEFAULT_TARGET, roundKey, finishRound } from "./js/rounds.js";
+import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js?v=3";
+import { W, H, MOODS, renderAll, computeParticles, drawBloom, drawParticle, strokeLayout, flowAngle } from "./js/painting.js?v=3";
+import { DEFAULT_TARGET, roundKey, finishRound } from "./js/rounds.js?v=3";
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, onAuthStateChanged } = await import(`${SDK}/firebase-auth.js`);
 const fsmod = await import(`${SDK}/firebase-firestore.js`);
@@ -283,7 +283,7 @@ function paletteFromStrokes() {
   const cols = strokes.slice(-40).map((s) => MOODS[s.color]?.colors).filter(Boolean).flat();
   palette = cols.length ? cols.concat(WARM) : WARM;
 }
-const EMBERS = 120, embers = [];
+const EMBERS = 190, embers = [];
 function spawn(e, x, y, cols) {
   if (x === undefined) {
     if (strokes.length && Math.random() < 0.6) {
@@ -292,8 +292,8 @@ function spawn(e, x, y, cols) {
     } else { x = Math.random() * W; y = Math.random() * H; }
   }
   const c = cols || palette;
-  Object.assign(e, { x, y, age: 0, life: 260 + Math.random() * 520, size: 6 + Math.random() * Math.random() * 22,
-    speed: 0.35 + Math.random() * 0.9, img: sprite(c[Math.floor(Math.random() * c.length)]) });
+  Object.assign(e, { x, y, age: 0, life: 240 + Math.random() * 480, size: 9 + Math.random() * Math.random() * 30,
+    speed: 0.7 + Math.random() * 1.3, img: sprite(c[Math.floor(Math.random() * c.length)]) });
   return e;
 }
 for (let i = 0; i < EMBERS; i++) { const e = spawn({}); e.age = Math.random() * e.life; embers.push(e); }
@@ -318,7 +318,7 @@ function ambient(t) {
     const out = e.x < -40 || e.x > W + 40 || e.y < -40 || e.y > H + 40;
     if (e.age >= e.life || out) { if (i >= EMBERS) { embers.splice(i, 1); continue; } spawn(e); }
     const k = e.age / e.life, tw = 0.75 + 0.25 * Math.sin(t * 0.004 + i);
-    actx.globalAlpha = Math.sin(Math.PI * k) * 0.55 * tw;
+    actx.globalAlpha = Math.min(1, Math.sin(Math.PI * k) * 0.95 * tw);
     actx.drawImage(e.img, e.x - e.size, e.y - e.size, e.size * 2, e.size * 2);
   }
   actx.globalAlpha = 1;
@@ -395,7 +395,7 @@ setInterval(() => {
 onAuthStateChanged(auth, async (u) => {
   isAdmin = false;
   if (u && !u.isAnonymous) { try { isAdmin = (await getDoc(doc(db, "admins", u.uid))).exists(); } catch {} }
-  $("saved").textContent = isAdmin ? "host mode · rounds close automatically" : "view only · sign in on admin.html to run rounds";
+  $("saved").textContent = (isAdmin ? "host mode · rounds close automatically" : "view only · sign in on admin.html to run rounds") + " · v3";
   maybeFinish();
 });
 
