@@ -12,13 +12,29 @@
       position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
       width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.78vh;
     }
+    .stage { overflow: hidden; }
     canvas { width: 100%; height: 100%; display: block; }
+    /* slow "breathing" camera over the painting so it never looks frozen */
+    .paint { position: absolute; inset: 0; transform-origin: 50% 50%; animation: drift 80s ease-in-out infinite alternate; will-change: transform; }
+    @keyframes drift {
+      0%   { transform: scale(1.02) translate(0, 0); }
+      50%  { transform: scale(1.08) translate(-1.6%, 0.8%); }
+      100% { transform: scale(1.05) translate(1.4%, -1%); }
+    }
+    #amb { position: absolute; inset: 0; mix-blend-mode: screen; }
     .words { position: absolute; inset: 0; pointer-events: none; }
     .word {
       position: absolute; transform: translate(-50%, -50%);
       font-family: "Caveat", cursive; font-size: 3.2vh; color: #fff3e0; white-space: nowrap;
       text-shadow: 0 0 18px rgba(255, 170, 110, 0.9);
       animation: rise 7s ease-out forwards;
+    }
+    .word.echo { font-size: 2.6vh; color: #ffe6cf; text-shadow: 0 0 14px rgba(255, 150, 120, 0.7); animation: echo 9s ease-in-out forwards; }
+    @keyframes echo {
+      0% { opacity: 0; margin-top: 0.5vh; }
+      25% { opacity: 0.75; }
+      70% { opacity: 0.75; }
+      100% { opacity: 0; margin-top: -2vh; }
     }
     .word small { display: block; text-align: center; font-family: "Inter", sans-serif; font-size: 1.3vh; opacity: 0.7; }
     @keyframes rise {
@@ -37,7 +53,9 @@
     .qr {
       position: absolute; right: 2.2%; bottom: 3%; background: #fff3e0; padding: 1.2vh; border-radius: 0.6vh 0.6vh 0.6vh 2vh;
       transform: rotate(-1.5deg); box-shadow: 0 1vh 3vh rgba(0,0,0,0.5); text-align: center;
+      animation: bob 6s ease-in-out infinite;
     }
+    @keyframes bob { 50% { transform: rotate(0.5deg) translateY(-0.8vh); box-shadow: 0 1.6vh 4vh rgba(255,140,110,0.35); } }
     .qr img { width: 15vh; height: 15vh; display: block; }
     .qr span { display: block; font-family: "Caveat", cursive; font-size: 2.4vh; color: #2a1a14; margin-top: 0.4vh; }
     .start {
@@ -63,13 +81,35 @@
     @keyframes pulse { 50% { text-shadow: 0 0 60px rgba(255,120,140,1); } }
     .bar { width: 22vh; height: 0.7vh; background: rgba(255,255,255,0.12); border-radius: 1vh; margin-top: 0.8vh; overflow: hidden; }
     .bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb36b, #ff6f8e); transition: width 0.8s; }
+    /* idle showcase: earlier paintings cross-fade with a slow pan */
+    .show { position: absolute; inset: 0; opacity: 0; transition: opacity 3s ease; pointer-events: none; background: #0d070c; }
+    .show.on { opacity: 1; }
+    .show .sl { position: absolute; inset: 0; opacity: 0; transition: opacity 3s ease; }
+    .show .sl.on { opacity: 1; }
+    .show .sl img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .show .sl.on img { animation: kb 22s ease-in-out forwards; }
+    .show .sl.alt.on img { animation-name: kb2; }
+    @keyframes kb  { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.12) translate(-2%, -1.5%); } }
+    @keyframes kb2 { from { transform: scale(1.12) translate(2%, 1%); } to { transform: scale(1.03) translate(0, 0); } }
+    .show .cap {
+      position: absolute; left: 0; right: 0; bottom: 0; padding: 6vh 22vh 4vh 4%;
+      background: linear-gradient(transparent, rgba(13,7,12,0.85));
+      color: #fff3e0; font-family: "Caveat", cursive; font-size: 2.8vh; line-height: 1.35;
+      transition: opacity 1.2s ease;
+    }
+    .show .cap.fade { opacity: 0; }
+    .show .cap b { display: block; font-family: "Fraunces", serif; font-weight: 500; font-size: 4.2vh; }
+    .show .cap .k { font-family: "Inter", sans-serif; font-size: 1.6vh; letter-spacing: 0.12em; color: #ffb36b; text-transform: uppercase; }
     .saved { position: absolute; top: 2%; right: 2%; font: 12px "Inter", sans-serif; color: rgba(255,255,255,0.35); }
   </style>
 </head>
 <body>
   <div class="stage">
-    <canvas id="c" width="1920" height="1080"></canvas>
-    <div class="words" id="words"></div>
+    <div class="paint">
+      <canvas id="c" width="1920" height="1080"></canvas>
+      <canvas id="amb" width="960" height="540"></canvas>
+      <div class="words" id="words"></div>
+    </div>
     <div class="hud">
       <div class="logo">Afterglow</div>
       <div class="t" id="title">TONIGHT'S PAINTING</div>
@@ -78,6 +118,7 @@
     </div>
     <div class="gen" id="gen">The painting is coming to life…</div>
     <div class="reveal" id="reveal"><img id="revImg" alt=""><div class="cap" id="revCap"></div></div>
+    <div class="show" id="show"><div class="sl" id="sl0"><img alt=""></div><div class="sl alt" id="sl1"><img alt=""></div><div class="cap" id="showCap"></div></div>
     <div class="qr" id="qr"><img id="qrImg" alt=""><span>Add your word ✦</span></div>
     <div class="saved" id="saved"></div>
   </div>
@@ -85,12 +126,12 @@
 
 <script type="module">
 import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
-import { W, H, renderAll, computeParticles, drawBloom, drawParticle } from "./js/painting.js";
+import { W, H, MOODS, renderAll, computeParticles, drawBloom, drawParticle, strokeLayout, flowAngle } from "./js/painting.js";
 import { DEFAULT_TARGET, roundKey, finishRound } from "./js/rounds.js";
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
 const { getAuth, onAuthStateChanged } = await import(`${SDK}/firebase-auth.js`);
 const fsmod = await import(`${SDK}/firebase-firestore.js`);
-const { getFirestore, collection, doc, getDoc, onSnapshot } = fsmod;
+const { getFirestore, collection, doc, getDoc, getDocs, onSnapshot } = fsmod;
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -124,11 +165,12 @@ function subscribe() {
     if (r !== round) return;
     const all = snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => ts(a) - ts(b));
     if (first || snap.docChanges().some((c) => c.type === "removed")) {
-      first = false; strokes = all; queue.length = 0; renderAll(ctx, strokes, key());
+      first = false; strokes = all; queue.length = 0; renderAll(ctx, strokes, key()); paletteFromStrokes();
     } else {
       for (const c of snap.docChanges()) {
         if (c.type === "added" && !strokes.some((s) => s.id === c.doc.id)) {
           const s = { id: c.doc.id, ...c.doc.data() }; strokes.push(s); queue.push(s);
+          lastWordAt = Date.now(); stopShowcase();
         }
       }
     }
@@ -166,6 +208,7 @@ function watchReveal(n) {
     const d = snap.data();
     if (!d) return;
     $("gen").classList.toggle("on", d.status === "generating");
+    if (d.status === "generating") stopShowcase();
     if (d.status === "done") {
       watching?.(); watching = null;
       const img = await getDoc(doc(db, "bars", barId, "roundImages", roundKey(n)));
@@ -176,6 +219,7 @@ function watchReveal(n) {
 
 let revealTimer = null;
 function reveal(n, src, words) {
+  stopShowcase();
   $("gen").classList.remove("on");
   $("revImg").src = src;
   $("revCap").innerHTML = "";
@@ -191,7 +235,8 @@ function reveal(n, src, words) {
 
 // ---- live animation of new words ----
 let current = null, tick = 0;
-function frame() {
+function frame(t) {
+  ambient(t || 0);
   if (!current && queue.length) {
     const s = queue.shift();
     const data = computeParticles(s, key());
@@ -205,16 +250,147 @@ function frame() {
   }
   requestAnimationFrame(frame);
 }
-function showWord(s, x, y) {
+function showWord(s, x, y, echo = false) {
   const el = document.createElement("div");
-  el.className = "word";
+  el.className = echo ? "word echo" : "word";
   el.style.left = `${(x / W) * 100}%`;
   el.style.top = `${(y / H) * 100}%`;
   el.textContent = s.word;
   if (s.table) { const sm = document.createElement("small"); sm.textContent = `table ${s.table}`; el.appendChild(sm); }
   $("words").appendChild(el);
-  setTimeout(() => el.remove(), 7500);
+  setTimeout(() => el.remove(), echo ? 9500 : 7500);
+  burst(x, y, MOODS[s.color]?.colors || WARM, echo ? 10 : 26);
+  if (!echo) paletteFromStrokes();
 }
+
+// ---- ambient embers: always drifting along tonight's flow field ----
+const amb = $("amb"), actx = amb.getContext("2d");
+const WARM = ["#ffb36b", "#ff6f8e", "#ffd27a"];
+const sprites = new Map();
+function sprite(color) {
+  if (!sprites.has(color)) {
+    const c = document.createElement("canvas"); c.width = c.height = 32;
+    const g = c.getContext("2d"), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    const n = parseInt(color.slice(1), 16), rgb = `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+    gr.addColorStop(0, `rgba(255,250,240,1)`); gr.addColorStop(0.18, `rgba(${rgb},0.9)`); gr.addColorStop(1, `rgba(${rgb},0)`);
+    g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+    sprites.set(color, c);
+  }
+  return sprites.get(color);
+}
+let palette = WARM;
+function paletteFromStrokes() {
+  const cols = strokes.slice(-40).map((s) => MOODS[s.color]?.colors).filter(Boolean).flat();
+  palette = cols.length ? cols.concat(WARM) : WARM;
+}
+const EMBERS = 120, embers = [];
+function spawn(e, x, y, cols) {
+  if (x === undefined) {
+    if (strokes.length && Math.random() < 0.6) {
+      const p = strokeLayout(strokes[Math.floor(Math.random() * strokes.length)]);
+      x = p.x + (Math.random() - 0.5) * 260; y = p.y + (Math.random() - 0.5) * 200;
+    } else { x = Math.random() * W; y = Math.random() * H; }
+  }
+  const c = cols || palette;
+  Object.assign(e, { x, y, age: 0, life: 260 + Math.random() * 520, size: 6 + Math.random() * Math.random() * 22,
+    speed: 0.35 + Math.random() * 0.9, img: sprite(c[Math.floor(Math.random() * c.length)]) });
+  return e;
+}
+for (let i = 0; i < EMBERS; i++) { const e = spawn({}); e.age = Math.random() * e.life; embers.push(e); }
+function burst(x, y, cols, n) {
+  for (let i = 0; i < n; i++) {
+    const e = spawn({}, x + (Math.random() - 0.5) * 60, y + (Math.random() - 0.5) * 60, cols);
+    e.life = 180 + Math.random() * 260; e.speed *= 1.6; embers.push(e);
+  }
+  if (embers.length > EMBERS * 2) embers.splice(EMBERS, embers.length - EMBERS * 2);
+}
+function ambient(t) {
+  actx.setTransform(1, 0, 0, 1, 0, 0);
+  actx.clearRect(0, 0, amb.width, amb.height);
+  actx.setTransform(amb.width / W, 0, 0, amb.height / H, 0, 0);
+  actx.globalCompositeOperation = "lighter";
+  const night = key(), drift = t * 0.00002;
+  for (let i = embers.length - 1; i >= 0; i--) {
+    const e = embers[i];
+    const a = flowAngle(night, e.x, e.y, drift);
+    e.x += Math.cos(a) * e.speed; e.y += Math.sin(a) * e.speed - 0.12;
+    e.age++;
+    const out = e.x < -40 || e.x > W + 40 || e.y < -40 || e.y > H + 40;
+    if (e.age >= e.life || out) { if (i >= EMBERS) { embers.splice(i, 1); continue; } spawn(e); }
+    const k = e.age / e.life, tw = 0.75 + 0.25 * Math.sin(t * 0.004 + i);
+    actx.globalAlpha = Math.sin(Math.PI * k) * 0.55 * tw;
+    actx.drawImage(e.img, e.x - e.size, e.y - e.size, e.size * 2, e.size * 2);
+  }
+  actx.globalAlpha = 1;
+}
+
+// ---- echoes: when it's quiet, earlier words of this painting float up again ----
+let lastWordAt = Date.now();
+setInterval(() => {
+  if (document.hidden || showOn || $("reveal").classList.contains("on")) return;
+  if (current || queue.length || Date.now() - lastWordAt < 15000 || !strokes.length) return;
+  const s = strokes[Math.floor(Math.random() * strokes.length)];
+  const p = strokeLayout(s);
+  showWord(s, p.x, p.y, true);
+}, 9000);
+
+// ---- idle showcase: after a few quiet minutes, show earlier paintings for a while ----
+const IDLE_MS = 3 * 60 * 1000, PAUSE_MS = 6 * 60 * 1000, SLIDE_MS = 18000, MAX_SLIDES = 8;
+const imgCache = new Map();
+let showOn = false, showTimer = null, lastShowEnd = 0, slide = 0;
+async function startShowcase() {
+  showOn = true;
+  let list = [];
+  try {
+    const rs = await getDocs(collection(db, "bars", barId, "rounds"));
+    list = rs.docs.map((d) => ({ id: d.id, ...d.data() })).filter((r) => r.status === "done")
+      .sort((a, b) => (b.n || 0) - (a.n || 0)).slice(0, MAX_SLIDES);
+  } catch (e) { console.warn(e); }
+  if (!showOn) return;
+  if (!list.length) { showOn = false; lastShowEnd = Date.now(); return; }
+  let i = 0;
+  const next = async () => {
+    if (!showOn) return;
+    if (i >= list.length) return stopShowcase();
+    const r = list[i++];
+    let src = imgCache.get(r.id);
+    if (!src) {
+      try { const d = await getDoc(doc(db, "bars", barId, "roundImages", r.id)); src = d.exists() ? d.data().data : null; } catch {}
+      if (src) imgCache.set(r.id, src);
+    }
+    if (!showOn) return;
+    if (!src) return next();
+    const el = $("sl" + (slide & 1)), other = $("sl" + ((slide + 1) & 1));
+    slide++;
+    el.querySelector("img").src = src;
+    el.classList.remove("on"); void el.offsetWidth; el.classList.add("on");
+    other.classList.remove("on");
+    const cap = $("showCap"), first = !$("show").classList.contains("on");
+    cap.classList.add("fade");
+    setTimeout(() => {
+      cap.innerHTML = "";
+      const k = document.createElement("div"); k.className = "k"; k.textContent = "Painted together earlier";
+      const b = document.createElement("b"); b.textContent = `Painting #${r.n || r.id.slice(1)}`;
+      const p = document.createElement("div"); p.textContent = (r.words || []).slice(0, 14).map((w) => w.w).join(" · ");
+      cap.append(k, b, p);
+      cap.classList.remove("fade");
+    }, first ? 0 : 1400);
+    $("show").classList.add("on");
+    showTimer = setTimeout(next, SLIDE_MS);
+  };
+  next();
+}
+function stopShowcase() {
+  if (!showOn) return;
+  showOn = false; clearTimeout(showTimer); lastShowEnd = Date.now();
+  $("show").classList.remove("on");
+  setTimeout(() => { if (!showOn) { $("sl0").classList.remove("on"); $("sl1").classList.remove("on"); } }, 3200);
+}
+setInterval(() => {
+  if (showOn || document.hidden || $("reveal").classList.contains("on") || $("gen").classList.contains("on")) return;
+  const now = Date.now();
+  if (now - lastWordAt > IDLE_MS && now - lastShowEnd > PAUSE_MS) startShowcase();
+}, 5000);
 
 onAuthStateChanged(auth, async (u) => {
   isAdmin = false;

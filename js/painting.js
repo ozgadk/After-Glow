@@ -115,6 +115,12 @@ export function computeParticles(stroke, night) {
   return { cx, cy, color: mood.colors[0], parts };
 }
 
+// Flow-field direction at a canvas point (used by the screen's ambient embers).
+// `drift` slowly shifts the field so idle motion never repeats exactly.
+export function flowAngle(night, x, y, drift = 0) {
+  return fieldFor(night)(x * 0.0018 + drift, y * 0.0018 - drift * 0.6) * Math.PI * 4;
+}
+
 const fields = new Map();
 function fieldFor(night) {
   if (!fields.has(night)) fields.set(night, makeNoise(hashStr("field" + night)));

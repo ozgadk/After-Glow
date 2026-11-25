@@ -17,7 +17,7 @@ reply to him in Turkish, keep it short and practical, and be honest about what w
 |---|---|
 | `index.html?bar=snuggest&t=5` | Guest table page (QR on each of the 12 tables). Notes + photos, painting word input, keepsake postcards, gallery button |
 | `index.html?bar=snuggest&paint=1` | Painting-only page (QR on the bar screen) |
-| `screen.html?bar=snuggest` | Bar TV: Living Painting. Signed-in admin = host mode (closes rounds) |
+| `screen.html?bar=snuggest` | Bar TV: Living Painting. Signed-in admin = host mode (closes rounds). Never static: drifting embers on the flow field, slow camera drift, earlier words echo after 15 s quiet, after 3 min quiet a slideshow of earlier finished paintings (any new word interrupts) |
 | `admin.html?bar=snuggest` | Moderation: notes/photos, painting words, rounds, wall poster fill |
 | `gallery.html?bar=snuggest` | AR wall gallery (MindAR) + plain browse view |
 
