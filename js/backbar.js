@@ -1,8 +1,13 @@
 // "← Admin" button for pages opened from the admin app (nav buttons add from=admin,
 // app shortcuts add source=app). Guests never see it.
 const q = new URLSearchParams(location.search);
-const fromApp = q.get("from") === "admin" || q.get("source") === "app"
+// Remembered for the tab, so links inside these pages (e.g. guest page → gallery) keep it.
+const KEY = "afterglow-from-admin";
+let remembered = false;
+try { remembered = sessionStorage.getItem(KEY) === "1"; } catch {}
+const fromApp = remembered || q.get("from") === "admin" || q.get("source") === "app"
   || matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+if (fromApp) try { sessionStorage.setItem(KEY, "1"); } catch {}
 if (fromApp) {
   const bar = q.get("bar") || "snuggest";
   const a = document.createElement("a");
@@ -16,6 +21,15 @@ if (fromApp) {
     "box-shadow:0 4px 14px rgba(0,0,0,0.4)", "transition:opacity .6s", "cursor:pointer", "-webkit-tap-highlight-color:transparent"
   ].join(";");
   document.body.appendChild(a);
+  // links to other Afterglow pages open in the same window and keep from=admin
+  addEventListener("click", (e) => {
+    const l = e.target.closest?.("a[href]");
+    if (!l || l === a) return;
+    const u = new URL(l.href, location.href);
+    if (u.origin !== location.origin || !/\.html$/.test(u.pathname) || /admin\.html$/.test(u.pathname)) return;
+    u.searchParams.set("from", "admin");
+    l.href = u.href; l.removeAttribute("target");
+  }, true);
   // push page content down so the button never covers the header (not on the TV screen)
   if (!/screen\.html$/.test(location.pathname)) document.body.style.paddingTop = "calc(env(safe-area-inset-top, 0px) + 52px)";
   // on the bar TV keep it out of the way: fade out, come back on mouse move / tap

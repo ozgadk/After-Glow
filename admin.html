@@ -215,7 +215,7 @@ function paintView() {
       <label style="margin-top:10px">Words per painting <input type="number" id="tgt" min="20" max="30" style="width:70px"> <button class="btn" id="tsave">Save</button></label>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
         <button class="btn primary" id="pfinish">Finish this painting now</button>
-        <a class="btn" href="screen.html?bar=${encodeURIComponent(barId)}" target="_blank">Open bar screen ↗</a>
+        <a class="btn" href="screen.html?bar=${encodeURIComponent(barId)}&from=admin">Open bar screen ↗</a>
       </div>
       <p class="intro" style="margin:10px 0 0;font-size:13px">The bar screen closes a painting automatically when it reaches the target, as long as you're signed in on that screen.</p>
     </div>
