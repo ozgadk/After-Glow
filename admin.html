@@ -5,6 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Afterglow · Admin</title>
+  <link rel="manifest" href="admin.webmanifest">
+  <meta name="theme-color" content="#1a0d17">
+  <link rel="icon" href="assets/app/favicon-32.png" sizes="32x32">
+  <link rel="icon" href="assets/app/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/app/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Afterglow">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500&family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <style>
@@ -22,12 +31,29 @@
     .badge.pending { background: #ffe08a; } .badge.hidden { background: #ddd; } .badge.rep { background: #ffb4a8; }
     code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 6px; word-break: break-all; }
     label { display: flex; align-items: center; gap: 10px; }
+    header { flex-wrap: wrap; padding-top: env(safe-area-inset-top); }
+    .appnav { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+    .appnav a.btn { text-decoration: none; display: inline-block; }
+    .hint { font-size: 13px; color: #c9b3a8; margin-top: 8px; }
+    .hint b { color: var(--amber); }
+    .offline { position: fixed; left: 50%; top: 10px; transform: translateX(-50%); background: #e74c3c; color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 13px; z-index: 50; }
     input[type=text] { background: var(--paper); border: none; border-radius: 8px; padding: 8px 10px; font-size: 15px; }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <header><div class="logo">Afterglow · Admin</div><button class="btn" id="out" hidden>Sign out</button></header>
+  <header>
+    <div class="logo">Afterglow · Admin</div>
+    <nav class="appnav">
+      <a class="btn" id="navScreen" href="screen.html" target="_blank" rel="noopener">📺 Bar screen</a>
+      <a class="btn" id="navGallery" href="gallery.html" target="_blank" rel="noopener">🖼 Gallery</a>
+      <a class="btn" id="navGuest" href="index.html" target="_blank" rel="noopener">👀 Guest view</a>
+      <button class="btn primary" id="install" hidden>⬇ Install app</button>
+      <button class="btn" id="out" hidden>Sign out</button>
+    </nav>
+  </header>
+  <div class="hint" id="iosHint" hidden>To get the app icon: tap <b>Share</b> → <b>Add to Home Screen</b>.</div>
+  <div class="offline" id="offline" hidden>No internet — changes will sync when it's back</div>
   <div id="app"><p class="loading">Loading…</p></div>
 </div>
 <div class="toast" id="toast"></div>
@@ -37,7 +63,7 @@ import { firebaseConfig, DEFAULT_BAR, SDK } from "./js/firebase-config.js";
 import { W, H, renderAll, MOODS } from "./js/painting.js";
 import { DEFAULT_TARGET, roundKey, finishRound, regenerate } from "./js/rounds.js";
 const { initializeApp } = await import(`${SDK}/firebase-app.js`);
-const { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } = await import(`${SDK}/firebase-auth.js`);
+const { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut } = await import(`${SDK}/firebase-auth.js`);
 const fsmod = await import(`${SDK}/firebase-firestore.js`);
 const { getFirestore, collection, doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, getDocs, serverTimestamp } = fsmod;
 
@@ -55,7 +81,11 @@ function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("s
 function signInView() {
   $("#app").innerHTML = `<div class="card"><p>Sign in with Google to moderate notes.</p>
     <button class="btn primary" id="g">Sign in with Google</button></div>`;
-  $("#g").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => toast(e.message));
+  $("#g").onclick = () => signInWithPopup(auth, new GoogleAuthProvider()).catch((e) => {
+    // installed apps (esp. iPhone) sometimes can't open popups → fall back to a full-page redirect
+    if (/popup-blocked|operation-not-supported|cancelled-popup|web-storage/.test(e.code || "")) return signInWithRedirect(auth, new GoogleAuthProvider());
+    if (e.code !== "auth/popup-closed-by-user") toast(e.message);
+  });
 }
 
 function notAdminView(u) {
@@ -130,6 +160,7 @@ function renderList() {
     b.onclick = () => { filter = k; renderList(); };
     $("#tabs").appendChild(b);
   }
+  setBadge(notes.filter(tabs[0][2]).length);
   const tables = new Set(notes.filter((n) => n.status === "visible").map((n) => n.table));
   $("#stats").textContent = `${notes.length} notes total · ${tables.size} tables with visible notes`;
 
@@ -335,10 +366,30 @@ function loadPhoto(id) {
 
 $("#out").onclick = () => signOut(auth);
 
+// ---- app shell: install, nav links, badge, offline ----
+const q = `?bar=${encodeURIComponent(barId)}`;
+$("#navScreen").href = `screen.html${q}`;
+$("#navGallery").href = `gallery.html${q}`;
+$("#navGuest").href = `index.html${q}&t=1`;
+const standalone = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+let installEvt = null;
+addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); installEvt = e; $("#install").hidden = false; });
+addEventListener("appinstalled", () => { $("#install").hidden = true; toast("Installed ✔ — open Afterglow from your desktop / home screen"); });
+$("#install").onclick = async () => { if (!installEvt) return; installEvt.prompt(); await installEvt.userChoice; installEvt = null; $("#install").hidden = true; };
+if (!standalone && /iPhone|iPad|iPod/.test(navigator.userAgent)) $("#iosHint").hidden = false;
+function setBadge(n) {
+  document.title = n ? `(${n}) Afterglow · Admin` : "Afterglow · Admin";
+  try { n ? navigator.setAppBadge?.(n) : navigator.clearAppBadge?.(); } catch {}
+}
+const net = () => ($("#offline").hidden = navigator.onLine);
+addEventListener("online", net); addEventListener("offline", net); net();
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch((e) => console.warn("sw", e));
+getRedirectResult(auth).catch((e) => toast(e.message));
+
 onAuthStateChanged(auth, async (u) => {
   unsub?.(); unsub = null;
   $("#out").hidden = !u || u.isAnonymous;
-  if (!u || u.isAnonymous) return signInView();
+  if (!u || u.isAnonymous) { setBadge(0); return signInView(); }
   try {
     const s = await getDoc(doc(db, "admins", u.uid));
     s.exists() ? adminView() : notAdminView(u);

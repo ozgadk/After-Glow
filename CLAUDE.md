@@ -21,6 +21,12 @@ reply to him in Turkish, keep it short and practical, and be honest about what w
 | `admin.html?bar=snuggest` | Moderation: notes/photos, painting words, rounds, wall poster fill |
 | `gallery.html?bar=snuggest` | AR wall gallery (MindAR) + plain browse view |
 
+**Admin is an installable app (PWA):** `admin.webmanifest` (start_url = admin, shortcuts to
+screen/gallery/guest view), icons in `assets/app/` (source `icon.svg`, PNGs rendered in headless
+Chromium), `sw.js` (network-first shell cache, same-origin only; bump `CACHE` if the shell list
+changes). Admin shows an Install button (Chrome/Edge/Android), an iOS "Add to Home Screen" hint,
+app badge = notes needing attention, and falls back to `signInWithRedirect` if the popup fails.
+
 ## Code map
 - `js/app.js` guest page · `js/i18n.js` EN/LV/RU/TR strings · `js/filter.js` client word filter
 - `js/photo.js` resize + "Afterglow tone" + EXIF strip + nsfw.js check (CDN)
