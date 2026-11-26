@@ -149,12 +149,19 @@ function render() {
   const nickDraft = document.getElementById("nick")?.value || "";
 
   app.innerHTML = `
-    <h1 class="table-name"></h1>
-    <p class="intro"></p>
-    <a class="gal-btn" id="galLink"></a>
-    <section id="paint"></section>
+    <section class="hero">
+      <div class="embers" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="venue"></div>
+      <h1 class="table-name"></h1>
+      <p class="intro"></p>
+      <div class="quick" id="quick">
+        <a class="qbtn primary" href="#composeSec" id="qNote"></a>
+        <a class="qbtn" href="#paint" id="qPaint"></a>
+      </div>
+    </section>
+    <div class="sec-head"><h2 id="notesTitle"></h2><span class="ncount" id="ncount"></span></div>
     <section class="notes" id="notes"></section>
-    <section class="compose">
+    <section class="compose" id="composeSec">
       <h2></h2>
       <textarea id="text" maxlength="280"></textarea>
       <div class="photo-pick">
@@ -167,9 +174,39 @@ function render() {
         <span class="count" id="count">0/280</span>
         <button class="send" id="send"></button>
       </div>
-    </section>`;
+    </section>
+    <section id="paint"></section>
+    <a class="gal-btn" id="galLink"></a>
+    <nav class="dock" id="dock" aria-hidden="true">
+      <a class="qbtn primary" href="#composeSec" id="dNote"></a>
+      <a class="qbtn" href="#paint" id="dPaint"></a>
+    </nav>`;
 
-  app.querySelector(".table-name").textContent = t("table", { n: table });
+  // "Table 5" → small label + big glowing number
+  const tn = app.querySelector(".table-name");
+  const [before, after = ""] = t("table", { n: "\u0000" }).split("\u0000");
+  const lbl = document.createElement("span"); lbl.className = "tlabel"; lbl.textContent = (before + after).trim();
+  const num = document.createElement("span"); num.className = "tnum"; num.textContent = table;
+  tn.append(lbl, num);
+  app.querySelector(".venue").textContent = barName;
+  app.querySelector("#notesTitle").textContent = t("notesTitle");
+  for (const id of ["qNote", "dNote"]) app.querySelector("#" + id).textContent = t("ctaNote");
+  for (const id of ["qPaint", "dPaint"]) app.querySelector("#" + id).textContent = t("ctaPaint");
+  app.querySelectorAll('a[href^="#"]').forEach((a) => a.onclick = (e) => {
+    e.preventDefault();
+    const target = app.querySelector(a.getAttribute("href"));
+    target?.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    if (a.getAttribute("href") === "#composeSec") setTimeout(() => app.querySelector("#text")?.focus({ preventScroll: true }), 450);
+  });
+  // floating dock once the hero buttons scroll away
+  const dock = app.querySelector("#dock");
+  // keep the dock out of the way while typing (mobile keyboard)
+  app.onfocusin = (e) => { if (e.target.matches("input, textarea")) dock.classList.add("typing"); };
+  app.onfocusout = () => dock.classList.remove("typing");
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(([e]) => { dock.classList.toggle("on", !e.isIntersecting && e.boundingClientRect.top < 0); dock.setAttribute("aria-hidden", String(!dock.classList.contains("on"))); })
+      .observe(app.querySelector("#quick"));
+  }
   app.querySelector(".intro").textContent = t("intro");
   const gl = app.querySelector("#galLink");
   gl.textContent = t("galleryBtn");
@@ -312,6 +349,8 @@ function renderNotes() {
   if (!el) return;
   el.innerHTML = "";
   const visible = notes.filter((n) => (n.reportCount || 0) < HIDE_AFTER_REPORTS);
+  const nc = document.getElementById("ncount");
+  if (nc) nc.textContent = visible.length === 0 ? "" : visible.length === 1 ? t("notesCount1") : t("notesCountN", { n: visible.length });
   if (!visible.length) {
     const e = document.createElement("div");
     e.className = "empty";
@@ -319,7 +358,7 @@ function renderNotes() {
     el.appendChild(e);
     return;
   }
-  visible.forEach((n) => el.appendChild(noteEl(n)));
+  visible.forEach((n, i) => { const c = noteEl(n); c.style.animationDelay = `${Math.min(i, 8) * 70}ms`; el.appendChild(c); });
 }
 
 // ---- living painting: rounds + keepsakes ----
@@ -329,7 +368,7 @@ function watchBar() {
     const d = snap.exists() ? snap.data() : {};
     curRound = d.currentRound || 1;
     roundTarget = Math.min(30, Math.max(20, d.roundTarget || DEFAULT_TARGET));
-    if (d.name) barName = d.name;
+    if (d.name) { barName = d.name; const v = document.querySelector(".venue"); if (v) v.textContent = barName; }
     if (d.instagram !== undefined) barTag.instagram = d.instagram;
     if (d.hashtag !== undefined) barTag.hashtag = d.hashtag;
     if (countRound !== curRound) {

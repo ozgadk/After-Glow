@@ -196,3 +196,153 @@ header { display: flex; align-items: center; justify-content: space-between; gap
   color: #f6e9e2; border: 1px solid rgba(255,179,107,0.5);
   background: rgba(255,179,107,0.10); box-shadow: 0 0 30px rgba(255,140,90,0.15);
 }
+
+/* =========================================================
+   Guest table page — v2 look (hero, paper notes, dock)
+   ========================================================= */
+body::before {
+  /* warm candle glow that slowly breathes behind everything */
+  content: ""; position: fixed; inset: -20% -20% auto; height: 70vh; z-index: -1; pointer-events: none;
+  background: radial-gradient(50% 50% at 50% 30%, rgba(255, 150, 90, 0.28), transparent 70%);
+  animation: candle 7s ease-in-out infinite alternate;
+}
+@keyframes candle { 0% { opacity: 0.7; transform: scale(1); } 40% { opacity: 1; } 100% { opacity: 0.8; transform: scale(1.06); } }
+
+#app .hero { position: relative; padding: 26px 0 8px; text-align: center; }
+#app .venue {
+  font-size: 12px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--amber); opacity: 0.9;
+}
+#app .table-name { margin: 10px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 0; }
+#app .tlabel {
+  font-family: "Fraunces", Georgia, serif; font-style: italic; font-weight: 500; font-size: 22px; color: #f1dccf; opacity: 0.85;
+}
+#app .tnum {
+  font-family: "Fraunces", Georgia, serif; font-weight: 600; font-size: 112px; line-height: 0.95; letter-spacing: -2px;
+  background: linear-gradient(180deg, #ffe0b0 0%, var(--amber) 45%, var(--rose) 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 28px rgba(255, 140, 100, 0.45));
+}
+#app .hero .intro { max-width: 340px; margin: 4px auto 22px; font-size: 16px; }
+#app .quick { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#app .qbtn {
+  display: flex; align-items: center; justify-content: center; text-align: center; text-decoration: none;
+  min-height: 50px; padding: 10px 12px; border-radius: 16px; font-weight: 600; font-size: 15px; line-height: 1.2;
+  color: #f6e9e2; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 179, 107, 0.35);
+  -webkit-tap-highlight-color: transparent; transition: transform 0.15s ease;
+}
+#app .qbtn.primary { color: var(--night); border-color: transparent; background: linear-gradient(135deg, var(--amber), var(--rose)); box-shadow: 0 8px 26px rgba(255, 110, 110, 0.35); }
+#app .qbtn:active { transform: scale(0.97); }
+
+/* tiny embers rising in the hero */
+#app .embers { position: absolute; inset: 0 -18px; overflow: hidden; pointer-events: none; z-index: -1; }
+#app .embers i {
+  position: absolute; bottom: -10px; width: 5px; height: 5px; border-radius: 50%;
+  background: radial-gradient(circle, #fff3e0 0%, #ffb36b 45%, transparent 70%);
+  animation: rise-ember 9s linear infinite; opacity: 0;
+}
+#app .embers i:nth-child(1) { left: 8%;  animation-delay: 0s;   animation-duration: 10s; }
+#app .embers i:nth-child(2) { left: 22%; animation-delay: 3s;   width: 4px; height: 4px; }
+#app .embers i:nth-child(3) { left: 37%; animation-delay: 6s;   animation-duration: 12s; }
+#app .embers i:nth-child(4) { left: 55%; animation-delay: 1.5s; width: 7px; height: 7px; }
+#app .embers i:nth-child(5) { left: 70%; animation-delay: 4.5s; animation-duration: 11s; }
+#app .embers i:nth-child(6) { left: 84%; animation-delay: 7.5s; width: 4px; height: 4px; }
+#app .embers i:nth-child(7) { left: 94%; animation-delay: 2.2s; animation-duration: 13s; }
+@keyframes rise-ember {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 0.9; }
+  100% { transform: translate(18px, -420px); opacity: 0; }
+}
+
+/* section header above the notes */
+#app .sec-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 34px 0 16px; padding-bottom: 10px; border-bottom: 1px solid rgba(255, 179, 107, 0.18); }
+#app .sec-head h2 { margin: 0; font-family: "Fraunces", Georgia, serif; font-weight: 500; font-size: 22px; }
+#app .ncount { font-size: 13px; color: var(--muted); text-align: right; }
+
+/* notes: paper slips, gently scattered */
+#app .notes { gap: 22px; }
+#app .note {
+  background:
+    radial-gradient(120% 80% at 0% 0%, rgba(255, 255, 255, 0.55), transparent 60%),
+    linear-gradient(180deg, #fff6e6, #fbe9d2);
+  padding: 22px 20px 14px;
+  border-radius: 3px 3px 3px 26px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 46px rgba(255, 150, 100, 0.10);
+}
+#app .note:nth-child(odd)  { margin-right: 18px; }
+#app .note:nth-child(even) { margin-left: 18px; }
+#app .note::before { width: 78px; height: 20px; background: rgba(255, 190, 140, 0.6); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08); }
+#app .note .text { font-size: 27px; color: #2a1a14; }
+#app .note .meta { border-top: 1px dashed rgba(122, 94, 82, 0.3); padding-top: 9px; margin-top: 12px; }
+#app .note .meta .who { color: #6b3f2e; }
+#app .empty {
+  font-size: 20px; padding: 34px 20px; border-color: rgba(255, 179, 107, 0.3);
+  background: rgba(255, 179, 107, 0.05);
+}
+
+/* compose: a blank note waiting to be written on */
+#app .compose {
+  position: relative; margin-top: 44px; padding: 26px 20px 18px; border: none;
+  background: linear-gradient(180deg, #fff6e6, #f9e5cc); color: var(--ink);
+  border-radius: 3px 3px 3px 26px; transform: rotate(-0.6deg);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.5), 0 0 70px rgba(255, 140, 90, 0.18);
+  scroll-margin-top: 20px;
+}
+#app .compose::before {
+  content: ""; position: absolute; top: -10px; left: 50%; width: 90px; height: 22px;
+  transform: translateX(-50%) rotate(2deg); background: rgba(255, 111, 142, 0.55); border-radius: 2px;
+}
+#app .compose h2 { color: #3a2218; font-size: 22px; margin-bottom: 8px; }
+#app .compose textarea {
+  background: transparent; padding: 4px 2px; min-height: 150px; font-size: 27px; line-height: 34px; color: #2a1a14;
+  background-image: repeating-linear-gradient(transparent 0 33px, rgba(160, 110, 90, 0.22) 33px 34px);
+  background-attachment: local; border-radius: 0; resize: none;
+}
+#app .compose textarea::placeholder { color: rgba(90, 60, 45, 0.45); }
+#app .compose input#nick {
+  background: transparent; border-bottom: 1.5px solid rgba(122, 94, 82, 0.35); border-radius: 0; padding: 10px 2px; margin-top: 12px;
+}
+#app .compose .pick-btn { color: #8a4b2e; border-color: rgba(138, 75, 46, 0.45); background: rgba(255, 179, 107, 0.15); }
+#app .compose .moods button { background: rgba(122, 94, 82, 0.10); font-size: 22px; padding: 6px 9px; }
+#app .compose .moods button.on { background: rgba(255, 179, 107, 0.45); border-color: #e08a4a; }
+#app .compose .count { color: #8a6d60; }
+#app .compose .send { padding: 14px 26px; }
+#app .compose .preview .remove { color: #8a6d60; }
+
+/* painting card */
+#app .paint {
+  position: relative; margin: 40px 0 26px; padding: 20px 18px; overflow: hidden; scroll-margin-top: 20px;
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(165, 139, 255, 0.20), transparent 60%),
+    radial-gradient(90% 70% at 0% 100%, rgba(255, 111, 142, 0.20), transparent 60%),
+    rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 179, 107, 0.3);
+  box-shadow: 0 0 60px rgba(255, 140, 90, 0.10) inset;
+}
+#app .paint h2 { font-size: 21px; }
+#app .pprog { height: 8px; margin-top: 4px; }
+#app .pprog i { box-shadow: 0 0 14px rgba(255, 140, 110, 0.8); }
+#app .sw { padding: 8px 12px; font-size: 14px; }
+#app .paint-row input { font-size: 24px; }
+
+/* gallery link as a card */
+#app .gal-btn { margin: 0 0 10px; padding: 16px; border-radius: 18px; font-size: 16px; }
+
+/* floating dock with the two main actions */
+#app .dock {
+  position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 9;
+  width: min(520px, calc(100% - 24px)); transform: translate(-50%, 140%);
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 8px; border-radius: 22px;
+  background: rgba(24, 13, 21, 0.78); border: 1px solid rgba(255, 179, 107, 0.25);
+  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); transition: transform 0.35s ease;
+}
+#app .dock.on { transform: translate(-50%, 0); }
+#app .dock .qbtn { min-height: 46px; font-size: 14px; }
+
+@media (prefers-reduced-motion: reduce) {
+  body::before, #app .embers i, .note { animation: none !important; }
+  #app .embers { display: none; }
+}
+#app .compose .moods { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+#app .compose .moods button { padding: 6px 0; }
+#app .dock.typing { transform: translate(-50%, 140%); }

@@ -41,6 +41,12 @@ export const STRINGS = {
     anon: "Anonymous",
     privacy: "No sign-up, no personal data. Please don't share phone numbers or private info.",
     noTable: "Scan the QR code on your table to see its notes.",
+    notesTitle: "Left at this table",
+    ctaNote: "✍️ Leave a note",
+    ctaPaint: "🎨 Paint a word",
+    notesCount0: "Nobody has left a note yet",
+    notesCount1: "1 note is waiting for you",
+    notesCountN: "{n} notes are waiting for you",
     loading: "Opening the table…"
   },
   lv: {
@@ -83,6 +89,12 @@ export const STRINGS = {
     anon: "Anonīms",
     privacy: "Bez reģistrācijas un personas datiem. Lūdzu, nedalies ar tālruņa numuriem vai privātu informāciju.",
     noTable: "Noskenē QR kodu uz sava galda, lai redzētu tā zīmītes.",
+    notesTitle: "Atstāts pie šī galda",
+    ctaNote: "✍️ Atstāt zīmīti",
+    ctaPaint: "🎨 Uzgleznot vārdu",
+    notesCount0: "Vēl neviens nav atstājis zīmīti",
+    notesCount1: "Tevi gaida 1 zīmīte",
+    notesCountN: "Tevi gaida {n} zīmītes",
     loading: "Atveram galdu…"
   },
   ru: {
@@ -125,6 +137,12 @@ export const STRINGS = {
     anon: "Аноним",
     privacy: "Без регистрации и личных данных. Пожалуйста, не публикуй номера телефонов и личную информацию.",
     noTable: "Отсканируй QR-код на своём столике, чтобы увидеть записки.",
+    notesTitle: "Оставлено за этим столиком",
+    ctaNote: "✍️ Оставить записку",
+    ctaPaint: "🎨 Нарисовать слово",
+    notesCount0: "Здесь ещё никто не оставил записку",
+    notesCount1: "Тебя ждёт 1 записка",
+    notesCountN: "Записок, которые ждут тебя: {n}",
     loading: "Открываем столик…"
   },
   tr: {
@@ -167,6 +185,12 @@ export const STRINGS = {
     anon: "Anonim",
     privacy: "Kayıt yok, kişisel veri yok. Lütfen telefon numarası ya da özel bilgi paylaşma.",
     noTable: "Notları görmek için masandaki QR kodu okut.",
+    notesTitle: "Bu masada bırakılanlar",
+    ctaNote: "✍️ Not bırak",
+    ctaPaint: "🎨 Kelime boya",
+    notesCount0: "Henüz kimse not bırakmadı",
+    notesCount1: "Seni bekleyen 1 not var",
+    notesCountN: "Seni bekleyen {n} not var",
     loading: "Masa açılıyor…"
   }
 };
