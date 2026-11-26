@@ -2,10 +2,10 @@
 // app shell usable when the bar's wifi drops. Network-first, so every deploy is
 // picked up immediately; the cache is only a fallback. Firebase / CDNs are never
 // touched (cross-origin requests pass straight through).
-const CACHE = "afterglow-shell-v1";
+const CACHE = "afterglow-shell-v2";
 const SHELL = [
   "admin.html", "screen.html", "gallery.html", "index.html", "css/style.css",
-  "js/firebase-config.js", "js/painting.js", "js/rounds.js", "js/i18n.js", "js/filter.js", "js/photo.js", "js/app.js",
+  "js/firebase-config.js", "js/painting.js", "js/rounds.js", "js/i18n.js", "js/filter.js", "js/photo.js", "js/app.js", "js/backbar.js",
   "admin.webmanifest", "assets/app/icon-192.png", "assets/app/icon.svg"
 ];
 const CACHEABLE = /\.(html|js|css|svg|png|webmanifest)$|\/$/;

@@ -21,7 +21,8 @@ reply to him in Turkish, keep it short and practical, and be honest about what w
 | `admin.html?bar=snuggest` | Moderation: notes/photos, painting words, rounds, wall poster fill |
 | `gallery.html?bar=snuggest` | AR wall gallery (MindAR) + plain browse view |
 
-**Admin is an installable app (PWA):** `admin.webmanifest` (start_url = admin, shortcuts to
+**Admin is an installable app (PWA):** Admin nav opens pages in the same window with `from=admin`;
+`js/backbar.js` then shows a "← Admin" button (fades out on screen.html). Also: `admin.webmanifest` (start_url = admin, shortcuts to
 screen/gallery/guest view), icons in `assets/app/` (source `icon.svg`, PNGs rendered in headless
 Chromium), `sw.js` (network-first shell cache, same-origin only; bump `CACHE` if the shell list
 changes). Admin shows an Install button (Chrome/Edge/Android), an iOS "Add to Home Screen" hint,
